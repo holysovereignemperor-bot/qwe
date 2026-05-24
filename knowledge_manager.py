@@ -1,25 +1,27 @@
 import os
 import json
 from typing import Dict, Any, Optional
+from document_indexer import DocumentIndexer
 
 class KnowledgeManager:
-    """Manages profile-based context injection from the knowledge/ directory."""
+    """Manages profile-based context injection and local document search."""
     def __init__(self, knowledge_dir="knowledge"):
         self.knowledge_dir = knowledge_dir
+        self.indexer = DocumentIndexer(os.path.join(knowledge_dir, "docs"))
         if not os.path.exists(self.knowledge_dir):
             os.makedirs(self.knowledge_dir)
 
     def get_profile(self, profile_name: str) -> Optional[Dict[str, Any]]:
-        if not profile_name:
-            return None
+        if not profile_name: return None
         path = os.path.join(self.knowledge_dir, f"{profile_name}.json")
         if os.path.exists(path):
             try:
-                with open(path, 'r') as f:
-                    return json.load(f)
-            except Exception:
-                return None
+                with open(path, 'r') as f: return json.load(f)
+            except Exception: return None
         return None
+
+    def search_docs(self, query: str):
+        return self.indexer.search(query)
 
     def list_profiles(self):
         return [f.replace(".json", "") for f in os.listdir(self.knowledge_dir) if f.endswith(".json")]
@@ -27,7 +29,5 @@ class KnowledgeManager:
     def save_profile(self, profile_name: str, data: Dict[str, Any]):
         path = os.path.join(self.knowledge_dir, f"{profile_name}.json")
         try:
-            with open(path, 'w') as f:
-                json.dump(data, f, indent=2)
-        except Exception:
-            pass
+            with open(path, 'w') as f: json.dump(data, f, indent=2)
+        except Exception: pass

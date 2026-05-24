@@ -1,3 +1,4 @@
+import os
 import asyncio
 import sys
 import argparse
@@ -16,46 +17,42 @@ from web_server import run_server
 def main():
     parser = argparse.ArgumentParser(description="OmniAgent OS")
     parser.add_argument("--cli", action="store_true", help="Run in CLI mode")
-    parser.add_argument("--goal", type=str, help="Goal for the agent (CLI mode only)")
-    parser.add_argument("--profile", type=str, help="Knowledge profile to load", default="default")
+    parser.add_argument("--goal", type=str, help="Goal for the agent")
+    parser.add_argument("--profile", type=str, help="Knowledge profile", default="default")
+    parser.add_argument("--persona", type=str, help="Senior Engineer, Executive Assistant, Research Scientist")
     args = parser.parse_args()
 
-    # 1. Initialize Core
+    # 1. Initialize
     vision = VisionClient()
     memory = MemoryVault()
     registry = SkillRegistry()
-    loader = PluginLoader(registry)
-    loader.load_plugins()
+    loader = PluginLoader(registry); loader.load_plugins()
 
-    project = ProjectManager()
     knowledge = KnowledgeManager()
+    project = ProjectManager()
     rules = RuleManager()
 
+    if args.persona: rules.update_rule("persona", args.persona)
+
     profile_data = knowledge.get_profile(args.profile)
-    knowledge_context = f"Knowledge Profile ({args.profile}): {profile_data}" if profile_data else ""
+    knowledge_context = f"Profile ({args.profile}): {profile_data}" if profile_data else ""
     rules_context = rules.get_rules_context()
 
-    orchestrator = Orchestrator(vision, registry, memory)
+    orchestrator = Orchestrator(vision, registry, memory, knowledge)
 
-    # 2. Modes
+    # 2. Start
     if args.cli:
-        if not args.goal:
-            print("Error: --goal is required for CLI mode")
-            return
-
+        if not args.goal: return
         blackboard = Blackboard(args.goal)
         run_server(blackboard)
-
         full_context = f"{rules_context}\n{knowledge_context}\n{project.get_workspace_summary()}"
         asyncio.run(orchestrator.run(blackboard, full_context))
     else:
         from gui import OmniAgentGUI
         blackboard = Blackboard("")
         run_server(blackboard)
-
         app = OmniAgentGUI(orchestrator, blackboard)
         app.initial_context = f"{rules_context}\n{knowledge_context}\n{project.get_workspace_summary()}"
         app.mainloop()
 
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__": main()

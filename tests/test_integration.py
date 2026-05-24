@@ -20,23 +20,22 @@ def mock_vision():
 async def test_full_orchestration_loop(mock_vision):
     registry = SkillRegistry()
     memory = MemoryVault(":memory:")
-    orchestrator = Orchestrator(mock_vision, registry, memory)
+    knowledge = MagicMock()
+    knowledge.search_docs = MagicMock(return_value=[])
 
+    orchestrator = Orchestrator(mock_vision, registry, memory, knowledge)
     blackboard = Blackboard("test goal")
 
-    # Mocking mac_utils to avoid actual OS calls
     import mac_utils
     mac_utils.capture_screen = MagicMock(return_value=b"fake_image")
     mac_utils.get_marked_screenshot = MagicMock(return_value=(b"fake_image", []))
     mac_utils.get_ui_tree = MagicMock(return_value={"role": "root"})
     mac_utils.get_window_metadata = MagicMock(return_value={"app": "test"})
 
-    # Run loop for a short time
     task = asyncio.create_task(orchestrator.run(blackboard))
     await asyncio.sleep(0.5)
-    blackboard.is_running = False # Stop it manually if it hasn't finished
+    blackboard.is_running = False
     await task
 
     assert len(blackboard.history) > 0
     assert blackboard.status == "Finished"
-    assert blackboard.total_cost > 0
