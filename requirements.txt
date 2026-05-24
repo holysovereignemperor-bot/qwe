@@ -1,0 +1,17 @@
+pyobjc-core
+pyobjc-framework-ApplicationServices
+pyobjc-framework-Quartz
+pyobjc-framework-Cocoa
+pyautogui
+pynput
+openai
+pydantic
+pillow
+psutil
+customtkinter
+fastapi
+uvicorn
+numpy
+pytest
+python-dotenv
+importlib-metadata
