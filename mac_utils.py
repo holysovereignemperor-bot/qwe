@@ -3,7 +3,7 @@ import json
 import time
 import gc
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 try:
     import Cocoa
@@ -20,6 +20,9 @@ def get_window_metadata():
 
     workspace = NSWorkspace.sharedWorkspace()
     active_app = workspace.frontmostApplication()
+
+    if not active_app:
+        return {}
 
     metadata = {
         "active_app_name": active_app.localizedName(),
@@ -77,41 +80,104 @@ def get_ui_tree():
 
     return parse_element(frontmost_app_ptr)
 
-def capture_screen(quality=50, max_width=1024):
-    """Captures the screen, downscales, and returns as a JPEG byte buffer."""
+def capture_screen_raw():
+    """Captures the main screen and returns a PIL Image."""
     if not Quartz:
         return None
-
     display_id = Quartz.CGMainDisplayID()
     image_ref = Quartz.CGDisplayCreateImage(display_id)
-
     if not image_ref:
         return None
-
     width = Quartz.CGImageGetWidth(image_ref)
     height = Quartz.CGImageGetHeight(image_ref)
-
     provider = Quartz.CGImageGetDataProvider(image_ref)
     data = Quartz.CGDataProviderCopyData(provider)
-
     img = Image.frombuffer("RGBA", (width, height), data, "raw", "RGBA", 0, 1)
+    return img.convert("RGB")
 
-    if width > max_width:
-        ratio = max_width / float(width)
-        new_height = int(float(height) * ratio)
+def get_marked_screenshot(quality=50, max_width=1024):
+    """
+    Captures screen, draws numeric IDs on UI elements (Set-of-Mark),
+    and returns JPEG bytes.
+    """
+    img = capture_screen_raw()
+    if not img:
+        return None, []
+
+    ui_tree = get_ui_tree()
+    if "error" in ui_tree:
+        # Fallback to normal screenshot if tree extraction fails
+        return capture_screen(quality, max_width), []
+
+    elements = []
+    def collect_elements(node):
+        if "rect" in node and isinstance(node["rect"], dict):
+            # Only collect elements with reasonable size
+            rect = node["rect"]
+            if rect["w"] > 5 and rect["h"] > 5:
+                elements.append(node)
+        if "children" in node:
+            for child in node["children"]:
+                collect_elements(child)
+
+    collect_elements(ui_tree)
+
+    # Scale factor for drawing
+    native_w, native_h = img.size
+
+    draw = ImageDraw.Draw(img)
+    # Attempt to load a font, fallback to default
+    try:
+        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 20)
+    except:
+        font = ImageFont.load_default()
+
+    marks = []
+    for i, el in enumerate(elements[:100]): # Limit to 100 marks for clarity
+        rect = el["rect"]
+        x, y, w, h = rect["x"], rect["y"], rect["w"], rect["h"]
+
+        # Draw bounding box
+        draw.rectangle([x, y, x + w, y + h], outline="cyan", width=2)
+
+        # Draw numeric label
+        label = str(i)
+        draw.rectangle([x, y, x + 25, y + 25], fill="cyan")
+        draw.text((x + 5, y + 2), label, fill="black", font=font)
+
+        marks.append({
+            "id": i,
+            "role": el.get("role"),
+            "title": el.get("title"),
+            "rect": rect
+        })
+
+    # Optimization: Resize
+    if native_w > max_width:
+        ratio = max_width / float(native_w)
+        new_height = int(float(native_h) * ratio)
         img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
 
-    img = img.convert("RGB")
     buffer = BytesIO()
     img.save(buffer, format="JPEG", quality=quality)
 
-    del data
     gc.collect()
+    return buffer.getvalue(), marks
 
+def capture_screen(quality=50, max_width=1024):
+    img = capture_screen_raw()
+    if not img:
+        return None
+    native_w, native_h = img.size
+    if native_w > max_width:
+        ratio = max_width / float(native_w)
+        new_height = int(float(native_h) * ratio)
+        img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+    buffer = BytesIO()
+    img.save(buffer, format="JPEG", quality=quality)
     return buffer.getvalue()
 
 def is_trusted():
-    """Checks if the application has accessibility permissions."""
     if not ApplicationServices:
         return False
     return ApplicationServices.AXIsProcessTrusted()
@@ -126,20 +192,16 @@ class GhostOverlay:
     def show_target(self, x, y, duration=1000):
         if not self.master:
             return
-
         def _show():
             self.window = tk.Toplevel(self.master)
             self.window.overrideredirect(True)
             self.window.attributes("-topmost", True)
             self.window.attributes("-alpha", 0.7)
             self.window.geometry(f"50x50+{int(x-25)}+{int(y-25)}")
-
             canvas = tk.Canvas(self.window, width=50, height=50, bg="cyan", highlightthickness=0)
             canvas.pack()
             canvas.create_oval(5, 5, 45, 45, outline="white", width=2)
-
             self.window.after(duration, self.window.destroy)
-
         self.master.after(0, _show)
 
 def get_screen_dimensions():

@@ -111,6 +111,47 @@ class ExecuteCodeSkill(Skill):
                 "stderr": stderr.getvalue()
             }
 
+class GithubSkill(Skill):
+    """Integrates Git operations into the agent."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from github_manager import GithubManager
+        gh = GithubManager()
+        action = params.get("action")
+        args = params.get("args", [])
+        cwd = params.get("cwd", ".")
+
+        if action == "git":
+            return gh.run_git(args, cwd)
+        elif action == "pr":
+            return gh.create_pull_request(
+                repo=params.get("repo"),
+                title=params.get("title"),
+                head=params.get("head"),
+                body=params.get("body", "")
+            )
+        return {"status": "error", "error": f"Unknown github action: {action}"}
+
+class PluginGeneratorSkill(Skill):
+    """Allows the agent to self-evolve by writing its own skill plugins."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        name = params.get("name")
+        code = params.get("code")
+        plugin_dir = "plugins"
+
+        if not name or not code:
+            return {"status": "error", "error": "Missing name or code"}
+
+        if not os.path.exists(plugin_dir):
+            os.makedirs(plugin_dir)
+
+        path = os.path.join(plugin_dir, f"{name}.py")
+        try:
+            with open(path, "w") as f:
+                f.write(code)
+            return {"status": "success", "message": f"Skill plugin '{name}' generated and saved."}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
 class SkillRegistry:
     def __init__(self):
         self._skills: Dict[str, Skill] = {
@@ -118,7 +159,9 @@ class SkillRegistry:
             "type": TypeSkill(),
             "command": TerminalSkill(),
             "file": FileSystemSkill(),
-            "execute_code": ExecuteCodeSkill()
+            "execute_code": ExecuteCodeSkill(),
+            "github": GithubSkill(),
+            "generate_skill": PluginGeneratorSkill()
         }
 
     def register(self, name: str, skill: Skill):

@@ -12,12 +12,12 @@ class OmniAgentGUI(ctk.CTk):
         self.orchestrator = orchestrator
         self.blackboard = blackboard
         self.overlay = GhostOverlay(self)
-        self.initial_context = "" # Set by main.py
+        self.initial_context = ""
 
         self.orchestrator.status_callback = self.handle_agent_event
 
-        self.title("OmniAgent OS - Ultimate Edition")
-        self.geometry("1000x700")
+        self.title("OmniAgent OS - Singularity Edition")
+        self.geometry("1100x750")
         ctk.set_appearance_mode("dark")
 
         self.grid_columnconfigure(0, weight=1)
@@ -27,10 +27,10 @@ class OmniAgentGUI(ctk.CTk):
         self.header = ctk.CTkFrame(self, height=80, fg_color="#0b0c10")
         self.header.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
 
-        self.goal_entry = ctk.CTkEntry(self.header, placeholder_text="Command the agency...", width=600, fg_color="#1f2833", text_color="#fff", border_color="#00e5ff")
+        self.goal_entry = ctk.CTkEntry(self.header, placeholder_text="Command the singularity...", width=600, fg_color="#1f2833", text_color="#fff", border_color="#00e5ff")
         self.goal_entry.pack(side="left", padx=20, pady=15)
 
-        self.run_btn = ctk.CTkButton(self.header, text="INITIATE", fg_color="#00e5ff", text_color="#0b0c10", hover_color="#00ffa3", font=("SF Pro Display", 14, "bold"), command=self.start_task)
+        self.run_btn = ctk.CTkButton(self.header, text="EXECUTE", fg_color="#00e5ff", text_color="#0b0c10", hover_color="#00ffa3", font=("SF Pro Display", 14, "bold"), command=self.start_task)
         self.run_btn.pack(side="left", padx=10)
 
         self.resource_label = ctk.CTkLabel(self.header, text="CPU: 0% | RAM: 0MB | Cost: $0.00", text_color="#8b949e")
@@ -42,6 +42,7 @@ class OmniAgentGUI(ctk.CTk):
 
         self.tab_live = self.tabview.add("Live Actions")
         self.tab_memory = self.tabview.add("Neural Memory")
+        self.tab_skills = self.tabview.add("Skill Factory")
         self.tab_explorer = self.tabview.add("Project Explorer")
 
         # Live Actions Tab
@@ -54,6 +55,10 @@ class OmniAgentGUI(ctk.CTk):
         # Neural Memory Tab
         self.memory_list = ctk.CTkTextbox(self.tab_memory, fg_color="#1a1a1a", text_color="#00e5ff")
         self.memory_list.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Skill Factory Tab
+        self.skill_list = ctk.CTkTextbox(self.tab_skills, fg_color="#1a1a1a", text_color="#00ffa3")
+        self.skill_list.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Project Explorer Tab
         self.explorer_list = ctk.CTkTextbox(self.tab_explorer, fg_color="#1a1a1a", text_color="#8b949e")
@@ -79,6 +84,10 @@ class OmniAgentGUI(ctk.CTk):
         return {"frame": card, "status": status}
 
     def handle_agent_event(self, event_type, data):
+        # Ensure all UI updates happen on the main thread
+        self.after(0, lambda: self._handle_event_main_thread(event_type, data))
+
+    def _handle_event_main_thread(self, event_type, data):
         if event_type == "visual_feedback":
             x, y = data.get('x', 0), data.get('y', 0)
             self.overlay.show_target(x, y)
@@ -87,13 +96,15 @@ class OmniAgentGUI(ctk.CTk):
             self.log_box.see("end")
         elif event_type == "memory_hit":
             self.memory_list.insert("end", f"Pattern Found: {data}\n\n")
+        elif event_type == "skill_generated":
+            self.skill_list.insert("end", f"New Skill Evolved: {data}\n")
 
     def start_task(self):
         goal = self.goal_entry.get()
         if goal:
             self.blackboard.goal = goal
             self.blackboard.is_running = True
-            self.log_box.insert("end", f"--- INITIATING TASK: {goal} ---\n")
+            self.log_box.insert("end", f"--- INITIATING SINGULARITY TASK: {goal} ---\n")
             threading.Thread(target=self.run_orchestrator_sync).start()
 
     def run_orchestrator_sync(self):

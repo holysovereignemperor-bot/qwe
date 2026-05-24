@@ -5,7 +5,7 @@ import os
 from agents import ArchitectAgent, ExecutorAgent, AuditorAgent
 from blackboard import Blackboard
 from memory_vault import MemoryVault
-from mac_utils import capture_screen, get_ui_tree, get_window_metadata
+from mac_utils import get_marked_screenshot, get_ui_tree, get_window_metadata
 from vision_client import VisionClient
 from skills import SkillRegistry
 from report_generator import ReportGenerator
@@ -32,11 +32,14 @@ class Orchestrator:
                     blackboard.error = "Circuit breaker: Cost limit exceeded"
                     break
 
-                # 1. Perceive
-                blackboard.last_screenshot = capture_screen()
+                # 1. Perceive (Set-of-Mark)
+                blackboard.last_screenshot, marks = get_marked_screenshot()
                 blackboard.last_ui_tree = get_ui_tree()
                 meta = get_window_metadata()
-                full_context = f"{project_context}\nWindow Metadata: {json.dumps(meta)}"
+
+                # Enrich context with visual marks
+                visual_context = f"Visual Marks (IDs on screenshot): {json.dumps(marks[:20])}..." # Summary for tokens
+                full_context = f"{project_context}\n{visual_context}\nWindow Metadata: {json.dumps(meta)}"
 
                 # 2. Plan
                 if not blackboard.plan:
@@ -67,7 +70,7 @@ class Orchestrator:
                         result = await skill.execute(repair_action.get('params', {}))
 
                 # 4. Verify
-                blackboard.last_screenshot = capture_screen()
+                blackboard.last_screenshot, _ = get_marked_screenshot()
                 blackboard.last_ui_tree = get_ui_tree()
 
                 verification = await self.auditor.verify(action, blackboard)
@@ -96,7 +99,6 @@ class Orchestrator:
         finally:
             blackboard.is_running = False
             blackboard.status = "Finished"
-            # Generate final report
             report_path = self.reporter.generate_report(blackboard)
             if self.status_callback:
                 self.status_callback("log", f"Final report generated at: {report_path}")

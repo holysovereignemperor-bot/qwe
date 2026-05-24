@@ -4,7 +4,7 @@ import os
 from typing import List, Dict, Any, Optional
 
 class MemoryVault:
-    """SQLite-based long-term memory for task patterns with improved retrieval."""
+    """SQLite-based long-term memory with relevance scoring and experience accumulation."""
     def __init__(self, db_path="memory_vault.db"):
         self.db_path = db_path
         self._init_db()
@@ -19,6 +19,7 @@ class MemoryVault:
                     plan TEXT,
                     success BOOLEAN,
                     score FLOAT DEFAULT 1.0,
+                    usage_count INTEGER DEFAULT 1,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -29,29 +30,38 @@ class MemoryVault:
 
     def save_experience(self, goal: str, plan: List[Dict[str, Any]], success: bool, score: float = 1.0):
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                "INSERT INTO experiences (goal, plan, success, score) VALUES (?, ?, ?, ?)",
-                (goal, json.dumps(plan), success, score)
-            )
+            # Check if similar goal exists to increment usage instead of duplicate
+            cursor = conn.execute("SELECT id, usage_count FROM experiences WHERE goal = ?", (goal,))
+            row = cursor.fetchone()
+            if row:
+                conn.execute(
+                    "UPDATE experiences SET usage_count = ?, score = score + ? WHERE id = ?",
+                    (row[1] + 1, score, row[0])
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO experiences (goal, plan, success, score) VALUES (?, ?, ?, ?)",
+                    (goal, json.dumps(plan), success, score)
+                )
 
     def retrieve_similar(self, goal: str, limit=5) -> List[Dict[str, Any]]:
-        """Weighted keyword search for better pattern matching."""
         words = goal.lower().split()
         if not words:
             return []
 
-        # Ranking results based on number of matching keywords
         conditions = " OR ".join(["goal LIKE ?" for _ in words])
+        # Relevance = (Matches * 2) + Score + usage_count
+        match_expr = " + ".join([f"(CASE WHEN goal LIKE ? THEN 2 ELSE 0 END)" for _ in words])
+
         query = f"""
-            SELECT goal, plan, score,
-            ({" + ".join(["(CASE WHEN goal LIKE ? THEN 1 ELSE 0 END)" for _ in words])}) as match_count
+            SELECT goal, plan, score, usage_count,
+            ({match_expr}) as relevance
             FROM experiences
             WHERE success = 1 AND ({conditions})
-            ORDER BY match_count DESC, score DESC
+            ORDER BY relevance DESC, score DESC, usage_count DESC
             LIMIT ?
         """
 
-        # We need params for both conditions and the match_count sum
         params = [f"%{w}%" for w in words] * 2 + [limit]
 
         results = []
@@ -63,9 +73,10 @@ class MemoryVault:
                         "goal": row[0],
                         "plan": json.loads(row[1]),
                         "score": row[2],
-                        "relevance": row[3]
+                        "usage": row[3],
+                        "relevance": row[4]
                     })
-        except sqlite3.OperationalError as e:
-            print(f"Memory retrieval error: {e}")
+        except sqlite3.OperationalError:
+            pass
 
         return results
