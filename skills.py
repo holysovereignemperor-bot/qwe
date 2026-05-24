@@ -97,15 +97,27 @@ class GithubSkill(Skill):
         return {"status": "error", "error": f"Unknown github action: {action}"}
 
 class PluginGeneratorSkill(Skill):
+    """Autonomous Skill Lab: Generates, tests, and registers new skills."""
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         name, code = params.get("name"), params.get("code")
-        if not name or not code:
-            return {"status": "error", "error": "Missing name or code"}
+        test_code = params.get("test_code")
+        if not name or not code: return {"status": "error", "error": "Missing data"}
+
+        # 1. Write plugin
         path = os.path.join("plugins", f"{name}.py")
         try:
-            with open(path, "w") as f:
-                f.write(code)
-            return {"status": "success", "message": f"Skill plugin '{name}' generated."}
+            with open(path, "w") as f: f.write(code)
+
+            # 2. Optional: Run Autonomous Test
+            if test_code:
+                test_path = os.path.join("tests", f"test_{name}.py")
+                with open(test_path, "w") as f: f.write(test_code)
+                import subprocess
+                res = subprocess.run(["pytest", test_path], capture_output=True)
+                if res.returncode != 0:
+                    return {"status": "error", "error": f"Generated skill failed tests: {res.stderr.decode()}"}
+
+            return {"status": "success", "message": f"Skill '{name}' evolved and verified."}
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
@@ -143,6 +155,24 @@ class WebSearchSkill(Skill):
 
         return {"status": "success", "message": f"Opened search for: {query}. Agent should now perceive Safari."}
 
+class ClipboardSkill(Skill):
+    """Allows the agent to read and write the macOS system clipboard."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        action = params.get("action")
+        try:
+            import subprocess
+            if action == "copy":
+                text = params.get("text", "")
+                process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
+                process.communicate(text.encode('utf-8'))
+                return {"status": "success", "message": "Text copied to clipboard"}
+            elif action == "paste":
+                text = subprocess.check_output(['pbpaste']).decode('utf-8')
+                return {"status": "success", "text": text}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+        return {"status": "error", "error": "Unknown action"}
+
 class SkillRegistry:
     def __init__(self):
         self._skills: Dict[str, Skill] = {
@@ -154,7 +184,8 @@ class SkillRegistry:
             "github": GithubSkill(),
             "generate_skill": PluginGeneratorSkill(),
             "applescript": AppleScriptSkill(),
-            "web_search": WebSearchSkill()
+            "web_search": WebSearchSkill(),
+            "clipboard": ClipboardSkill()
         }
     def register(self, name: str, skill: Skill):
         self._skills[name] = skill

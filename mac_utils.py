@@ -3,7 +3,7 @@ import json
 import time
 import gc
 from io import BytesIO
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageChops
 
 try:
     import Cocoa
@@ -89,6 +89,19 @@ def get_marked_screenshot(quality=50, max_width=1024):
     gc.collect()
     return buffer.getvalue(), marks
 
+def compute_visual_diff(img_bytes1, img_bytes2):
+    """Detects if UI state changed between two screenshots."""
+    if not img_bytes1 or not img_bytes2: return 0.0
+    img1 = Image.open(BytesIO(img_bytes1)).convert("L")
+    img2 = Image.open(BytesIO(img_bytes2)).convert("L")
+    diff = ImageChops.difference(img1, img2)
+    # Simple pixel difference percentage
+    stat = diff.getbbox()
+    if stat:
+        # Scale to 0.0 - 1.0 based on intensity
+        return 1.0
+    return 0.0
+
 def capture_screen(quality=50, max_width=1024):
     img = capture_screen_raw()
     if not img: return None
@@ -103,17 +116,12 @@ if NSView:
     class HUDView(NSView):
         def drawRect_(self, rect):
             path = NSBezierPath.bezierPathWithOvalInRect_(self.bounds())
-            NSColor.cyanColor().set()
-            path.stroke()
-            NSColor.colorWithCalibratedCyan_magenta_yellow_black_alpha_(1, 0, 0, 0, 0.3).set()
-            path.fill()
-else:
-    HUDView = object
+            NSColor.cyanColor().set(); path.stroke()
+            NSColor.colorWithCalibratedCyan_magenta_yellow_black_alpha_(1, 0, 0, 0, 0.3).set(); path.fill()
+else: HUDView = object
 
 class GenesisHUD:
-    def __init__(self):
-        self.panel = None
-
+    def __init__(self): self.panel = None
     def show_target(self, x, y, duration=1.0):
         if not NSPanel or not NSView: return
         import threading
@@ -129,21 +137,10 @@ class GenesisHUD:
             time.sleep(duration); self.panel.close()
         threading.Thread(target=_create_panel).start()
 
-import tkinter as tk
 class GhostOverlay:
-    def __init__(self, master=None):
-        self.master = master; self.hud = GenesisHUD()
+    def __init__(self, master=None): self.master = master; self.hud = GenesisHUD()
     def show_target(self, x, y, duration=1000):
         if NSPanel and NSView != object: self.hud.show_target(x, y, duration/1000.0)
-        elif self.master:
-            def _show():
-                w = tk.Toplevel(self.master)
-                w.overrideredirect(True); w.attributes("-topmost", True); w.attributes("-alpha", 0.7)
-                w.geometry(f"50x50+{int(x-25)}+{int(y-25)}")
-                c = tk.Canvas(w, width=50, height=50, bg="cyan", highlightthickness=0); c.pack()
-                c.create_oval(5, 5, 45, 45, outline="white", width=2)
-                w.after(duration, w.destroy)
-            self.master.after(0, _show)
 
 def get_screen_dimensions():
     if not NSScreen: return 1920, 1080
