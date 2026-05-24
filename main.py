@@ -23,7 +23,7 @@ def main():
     parser.add_argument("--persona", type=str, help="Persona type")
     args = parser.parse_args()
 
-    # 1. Initialize Sovereign Core
+    # 1. Initialize Zenith Core
     vision = VisionClient()
     memory = MemoryVault()
     registry = SkillRegistry()
