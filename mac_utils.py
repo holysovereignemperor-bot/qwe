@@ -22,13 +22,11 @@ def get_window_metadata():
     return {"name": active_app.localizedName(), "bundle_id": active_app.bundleIdentifier(), "pid": active_app.processIdentifier()}
 
 def get_ui_tree():
-    """Apex Perception: Optimized Depth-First AX Tree Summary."""
     if not ApplicationServices or not ApplicationServices.AXIsProcessTrusted(): return {"error": "Accessibility not granted"}
     system_wide = ApplicationServices.AXUIElementCreateSystemWide()
     error, frontmost_app_ptr = ApplicationServices.AXUIElementCopyAttributeValue(system_wide, "AXFocusedApplication", None)
     if error != 0 or not frontmost_app_ptr: return {"error": "No frontmost app"}
-
-    def parse_element(element, depth=0, max_depth=7): # Increased depth for Apex
+    def parse_element(element, depth=0, max_depth=7):
         if depth > max_depth: return None
         attrs = ["AXTitle", "AXRole", "AXDescription", "AXValue", "AXFrame"]
         node = {}
@@ -39,13 +37,9 @@ def get_ui_tree():
                     try: node["rect"] = {"x": val.origin.x, "y": val.origin.y, "w": val.size.width, "h": val.size.height}
                     except AttributeError: node["rect"] = str(val)
                 else:
-                    # Apex: Only keep non-empty values to save RAM
-                    val_str = str(val).strip()
-                    if val_str: node[attr[2:].lower()] = val_str
-
-        # Apex: Filter nodes with no useful attributes
+                    v = str(val).strip()
+                    if v: node[attr[2:].lower()] = v
         if not node: return None
-
         err, children = ApplicationServices.AXUIElementCopyAttributeValue(element, "AXChildren", None)
         if err == 0 and children:
             node["children"] = []
@@ -81,13 +75,21 @@ def get_marked_screenshot(quality=50, max_width=1024):
     draw = ImageDraw.Draw(img)
     try: font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 20)
     except: font = ImageFont.load_default()
+
     marks = []
     for i, el in enumerate(elements[:100]):
         rect = el["rect"]; x, y, w, h = rect["x"], rect["y"], rect["w"], rect["h"]
+
+        # Privacy Shield: Redact Password fields or sensitive roles
+        if el.get("role") == "AXSecureTextField" or "password" in el.get("description", "").lower():
+            draw.rectangle([x, y, x + w, y + h], fill="black")
+            continue
+
         draw.rectangle([x, y, x + w, y + h], outline="cyan", width=2)
         draw.rectangle([x, y, x + 25, y + 25], fill="cyan")
         draw.text((x + 5, y + 2), str(i), fill="black", font=font)
         marks.append({"id": i, "role": el.get("role"), "title": el.get("title"), "rect": rect})
+
     img = img.convert("L").convert("RGB")
     native_w, native_h = img.size
     if native_w > max_width:

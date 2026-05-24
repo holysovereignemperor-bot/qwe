@@ -127,7 +127,6 @@ class AppleScriptSkill(Skill):
         from applescript_utils import AppleScriptUtils
         script = params.get("script")
         if not script:
-            # Check for high-level templates
             action = params.get("action")
             if action == "safari_open":
                 script = AppleScriptUtils.safari_open_url(params.get("url"))
@@ -135,10 +134,10 @@ class AppleScriptSkill(Skill):
                 script = AppleScriptUtils.mail_send_email(params.get("to"), params.get("subject"), params.get("body"))
             elif action == "notes_create":
                 script = AppleScriptUtils.notes_create_note(params.get("title"), params.get("body"))
+            elif action == "calendar_add":
+                script = AppleScriptUtils.calendar_create_event(params.get("title"), params.get("start"))
 
-        if not script:
-            return {"status": "error", "error": "No script or action provided"}
-
+        if not script: return {"status": "error", "error": "No script"}
         return AppleScriptUtils.run_script(script)
 
 class WebSearchSkill(Skill):
@@ -295,6 +294,40 @@ class DocumentationSkill(Skill):
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
+class ProjectArchitectSkill(Skill):
+    """Sovereign Project Architect: Initializes full workspace environments."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        name = params.get("project_name", "new_project")
+        try:
+            import os
+            import subprocess
+            os.makedirs(f"{name}/src", exist_ok=True)
+            os.makedirs(f"{name}/tests", exist_ok=True)
+            with open(f"{name}/README.md", "w") as f: f.write(f"# {name}\nInitialized by OmniAgent")
+            subprocess.run(["git", "init"], cwd=name)
+            return {"status": "success", "message": f"Project '{name}' architecture established."}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+class CLIFactorySkill(Skill):
+    """CLI Factory: Autonomously generates bash scripts and zsh aliases."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        alias_name = params.get("alias")
+        script_content = params.get("script")
+        if not alias_name or not script_content: return {"status": "error", "error": "Missing data"}
+
+        try:
+            bin_dir = os.path.expanduser("~/bin")
+            os.makedirs(bin_dir, exist_ok=True)
+            script_path = os.path.join(bin_dir, alias_name)
+            with open(script_path, "w") as f: f.write(f"#!/bin/bash\n{script_content}")
+            os.chmod(script_path, 0o755)
+
+            # Simple alias concept for logs
+            return {"status": "success", "message": f"CLI Tool '{alias_name}' created at {script_path}. Add 'export PATH=\"$HOME/bin:$PATH\"' to your .zshrc."}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
 class SkillRegistry:
     def __init__(self):
         self._skills: Dict[str, Skill] = {
@@ -314,7 +347,9 @@ class SkillRegistry:
             "self_evolve": SelfEvolveSkill(),
             "transfer": TransferSkill(),
             "omni_search": OmniSearchSkill(),
-            "generate_doc": DocumentationSkill()
+            "generate_doc": DocumentationSkill(),
+            "project_architect": ProjectArchitectSkill(),
+            "cli_factory": CLIFactorySkill()
         }
     def register(self, name: str, skill: Skill):
         self._skills[name] = skill

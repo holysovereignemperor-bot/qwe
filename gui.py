@@ -6,72 +6,74 @@ import os
 from PIL import Image
 from blackboard import Blackboard
 from mac_utils import GhostOverlay
-from menu_bar import MenuBarController
 
 class OmniAgentGUI(ctk.CTk):
     def __init__(self, orchestrator, blackboard):
         super().__init__()
         self.orchestrator = orchestrator; self.blackboard = blackboard
         self.overlay = GhostOverlay(self); self.initial_context = ""
-
         self.orchestrator.status_callback = self.handle_agent_event
-        self.title("OmniAgent OS: Apex Command"); self.geometry("1450x950")
+
+        self.title("OmniAgent OS: Prime Origin"); self.geometry("1450x950")
         ctk.set_appearance_mode("dark"); self.configure(fg_color="#000")
 
-        # Native Menu Bar
-        self.menubar = MenuBarController(self.start_task, lambda: setattr(self.blackboard, 'is_running', False))
-        self.menubar.setup_menu()
-
+        self.is_command_bar = False
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
 
-        # Apex Header
-        self.header = ctk.CTkFrame(self, height=80, fg_color="#0a0a0a", corner_radius=25, border_width=1, border_color="#1a1a1a")
+        # Origin Header
+        self.header = ctk.CTkFrame(self, height=80, fg_color="#0a0a0a", corner_radius=20)
         self.header.grid(row=0, column=0, sticky="ew", padx=20, pady=15)
 
-        self.goal_entry = ctk.CTkEntry(self.header, placeholder_text="Apex Input...", width=500, fg_color="#050505", border_color="#00ffa3")
-        self.goal_entry.pack(side="left", padx=30, pady=20)
+        self.goal_entry = ctk.CTkEntry(self.header, placeholder_text="Prime Origin Command...", width=500, fg_color="#000", border_color="#00ffa3", corner_radius=15)
+        self.goal_entry.pack(side="left", padx=25, pady=20)
 
-        self.run_btn = ctk.CTkButton(self.header, text="INITIATE", fg_color="#00ffa3", text_color="#000", font=("SF Pro Display", 14, "bold"), command=self.start_task)
+        self.run_btn = ctk.CTkButton(self.header, text="ORIGIN", fg_color="#00ffa3", text_color="#000", font=("SF Pro Display", 14, "bold"), corner_radius=15, command=self.start_task)
         self.run_btn.pack(side="left", padx=10)
 
-        self.telemetry = ctk.CTkLabel(self.header, text="APEX ONLINE", text_color="#00ffa3", font=("SF Mono", 12))
-        self.telemetry.pack(side="right", padx=35)
+        self.cmd_bar_btn = ctk.CTkButton(self.header, text="Command Bar", width=120, fg_color="#1a1a1a", corner_radius=15, command=self.toggle_command_bar)
+        self.cmd_bar_btn.pack(side="left", padx=10)
 
-        # Apex Tabs
-        self.tabs = ctk.CTkTabview(self, fg_color="#000", segmented_button_selected_color="#00ffa3", corner_radius=25)
+        self.telemetry = ctk.CTkLabel(self.header, text="PRIME: ONLINE", text_color="#00ffa3", font=("SF Mono", 12))
+        self.telemetry.pack(side="right", padx=30)
+
+        # Tabs
+        self.tabs = ctk.CTkTabview(self, fg_color="#000", segmented_button_selected_color="#00ffa3", corner_radius=20)
         self.tabs.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
+        self.tab_core = self.tabs.add("Origin Core"); self.tab_visual = self.tabs.add("Visual Stream")
 
-        self.tab_apex = self.tabs.add("Apex Logic")
-        self.tab_omnisearch = self.tabs.add("Omni-Search")
-        self.tab_visual = self.tabs.add("Visual Stream")
-        self.tab_docs = self.tabs.add("Doc Factory")
+        self.tab_core.grid_columnconfigure((0,1,2), weight=1); self.tab_core.grid_rowconfigure(0, weight=1)
+        self.pm_card = self.create_card(self.tab_core, "Architect", 0)
+        self.exec_card = self.create_card(self.tab_core, "Executor", 1)
+        self.qa_card = self.create_card(self.tab_core, "Auditor", 2)
 
-        # Apex Logic cards
-        self.tab_apex.grid_columnconfigure((0,1,2), weight=1); self.tab_apex.grid_rowconfigure(0, weight=1)
-        self.pm_card = self.create_card(self.tab_apex, "Architect", 0)
-        self.exec_card = self.create_card(self.tab_apex, "Executor", 1)
-        self.qa_card = self.create_card(self.tab_apex, "Auditor", 2)
-
-        # Monologue
-        self.monologue = ctk.CTkTextbox(self, height=150, fg_color="#000", text_color="#00ffa3", font=("SF Mono", 11), border_width=1, border_color="#1a1a1a")
-        self.monologue.grid(row=2, column=0, sticky="ew", padx=20, pady=25)
+        self.monologue = ctk.CTkTextbox(self, height=130, fg_color="#000", text_color="#00ffa3", font=("SF Mono", 11), border_width=1, border_color="#1a1a1a")
+        self.monologue.grid(row=2, column=0, sticky="ew", padx=20, pady=20)
 
         self.update_loop()
 
     def create_card(self, parent, title, col):
-        card = ctk.CTkFrame(parent, fg_color="#0a0a0a", border_width=2, border_color="#111", corner_radius=25)
-        card.grid(row=0, column=col, sticky="nsew", padx=15, pady=25)
-        lbl = ctk.CTkLabel(card, text=title, font=("SF Pro Display", 22, "bold"), text_color="#00e5ff"); lbl.pack(pady=25)
-        status = ctk.CTkLabel(card, text="Ready", text_color="#444", wraplength=250); status.pack(pady=20)
+        card = ctk.CTkFrame(parent, fg_color="#0a0a0a", border_width=2, border_color="#111", corner_radius=20)
+        card.grid(row=0, column=col, sticky="nsew", padx=15, pady=20)
+        lbl = ctk.CTkLabel(card, text=title, font=("SF Pro Display", 20, "bold"), text_color="#00e5ff"); lbl.pack(pady=20)
+        status = ctk.CTkLabel(card, text="Awaiting origin...", text_color="#444", wraplength=250); status.pack(pady=15)
         return {"frame": card, "status": status}
+
+    def toggle_command_bar(self):
+        self.is_command_bar = not self.is_command_bar
+        if self.is_command_bar:
+            # Spotlight style bar
+            self.geometry("700x120"); self.tabs.grid_remove(); self.monologue.grid_remove()
+            self.header.configure(corner_radius=30); self.cmd_bar_btn.configure(text="Exit Bar")
+        else:
+            self.geometry("1450x950"); self.tabs.grid(); self.monologue.grid()
+            self.header.configure(corner_radius=20); self.cmd_bar_btn.configure(text="Command Bar")
 
     def handle_agent_event(self, event_type, data):
         self.after(0, lambda: self._handle_event_main_thread(event_type, data))
 
     def _handle_event_main_thread(self, event_type, data):
         if event_type == "visual_feedback": self.overlay.show_target(data.get('x', 0), data.get('y', 0))
-        elif event_type == "log":
-             self.monologue.insert("end", f"⚡ {data}\n"); self.monologue.see("end")
+        elif event_type == "log": self.monologue.insert("end", f"⚡ {data}\n"); self.monologue.see("end")
         elif event_type == "agent_active":
              for name, card in [("PM", self.pm_card), ("Executor", self.exec_card), ("Auditor", self.qa_card)]:
                  card["frame"].configure(border_color="#00ffa3" if name == data else "#111")
@@ -87,5 +89,5 @@ class OmniAgentGUI(ctk.CTk):
 
     def update_loop(self):
         ram = psutil.virtual_memory().percent; cpu = psutil.cpu_percent()
-        self.telemetry.configure(text=f"RAM: {ram}% | CPU: {cpu}% | APEX")
+        self.telemetry.configure(text=f"RAM: {ram}% | CPU: {cpu}% | ORIGIN")
         self.after(1000, self.update_loop)
