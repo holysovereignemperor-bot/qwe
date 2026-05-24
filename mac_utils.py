@@ -46,9 +46,10 @@ def get_ui_tree():
         return node
     return parse_element(frontmost_app_ptr)
 
-def capture_screen_raw():
+def capture_screen_raw(display_id=None):
+    """Captures a display by ID. Defaults to main."""
     if not Quartz: return None
-    display_id = Quartz.CGMainDisplayID()
+    if display_id is None: display_id = Quartz.CGMainDisplayID()
     image_ref = Quartz.CGDisplayCreateImage(display_id)
     if not image_ref: return None
     width, height = Quartz.CGImageGetWidth(image_ref), Quartz.CGImageGetHeight(image_ref)
@@ -90,17 +91,11 @@ def get_marked_screenshot(quality=50, max_width=1024):
     return buffer.getvalue(), marks
 
 def compute_visual_diff(img_bytes1, img_bytes2):
-    """Detects if UI state changed between two screenshots."""
     if not img_bytes1 or not img_bytes2: return 0.0
     img1 = Image.open(BytesIO(img_bytes1)).convert("L")
     img2 = Image.open(BytesIO(img_bytes2)).convert("L")
     diff = ImageChops.difference(img1, img2)
-    # Simple pixel difference percentage
-    stat = diff.getbbox()
-    if stat:
-        # Scale to 0.0 - 1.0 based on intensity
-        return 1.0
-    return 0.0
+    return 1.0 if diff.getbbox() else 0.0
 
 def capture_screen(quality=50, max_width=1024):
     img = capture_screen_raw()
@@ -146,6 +141,12 @@ def get_screen_dimensions():
     if not NSScreen: return 1920, 1080
     f = NSScreen.mainScreen().frame()
     return f.size.width, f.size.height
+
+def get_all_displays():
+    """Detects all connected displays for multi-display perception."""
+    if not Quartz: return [0]
+    (err, displays, count) = Quartz.CGGetActiveDisplayList(10, None, None)
+    return displays if err == 0 else [Quartz.CGMainDisplayID()]
 
 def scale_coordinate(x, y, from_width, from_height):
     sw, sh = get_screen_dimensions()

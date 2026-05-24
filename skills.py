@@ -173,6 +173,26 @@ class ClipboardSkill(Skill):
             return {"status": "error", "error": str(e)}
         return {"status": "error", "error": "Unknown action"}
 
+class CommunicationSkill(Skill):
+    """Omni-Bridge: Sends updates to external platforms like Slack/Discord."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        import json
+        import subprocess
+        platform = params.get("platform") # "slack" or "discord"
+        webhook = params.get("webhook_url")
+        message = params.get("message", "")
+
+        if not webhook or not message: return {"status": "error", "error": "Missing webhook or message"}
+
+        payload = {"text": message} if platform == "slack" else {"content": message}
+        try:
+            # Using curl to keep it zero-dependency
+            cmd = ['curl', '-X', 'POST', '-H', 'Content-type: application/json', '--data', json.dumps(payload), webhook]
+            subprocess.run(cmd, capture_output=True)
+            return {"status": "success", "message": f"Sent to {platform}"}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
 class SkillRegistry:
     def __init__(self):
         self._skills: Dict[str, Skill] = {
@@ -185,7 +205,8 @@ class SkillRegistry:
             "generate_skill": PluginGeneratorSkill(),
             "applescript": AppleScriptSkill(),
             "web_search": WebSearchSkill(),
-            "clipboard": ClipboardSkill()
+            "clipboard": ClipboardSkill(),
+            "communication": CommunicationSkill()
         }
     def register(self, name: str, skill: Skill):
         self._skills[name] = skill
