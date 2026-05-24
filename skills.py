@@ -193,6 +193,21 @@ class CommunicationSkill(Skill):
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
+class NotificationSkill(Skill):
+    """Native macOS Notifications using NSUserNotificationCenter."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        title = params.get("title", "OmniAgent OS")
+        subtitle = params.get("subtitle", "")
+        message = params.get("message", "")
+
+        script = f'display notification "{message}" with title "{title}" subtitle "{subtitle}"'
+        try:
+            import subprocess
+            subprocess.run(['osascript', '-e', script])
+            return {"status": "success", "message": "Notification sent"}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
 class SkillRegistry:
     def __init__(self):
         self._skills: Dict[str, Skill] = {
@@ -206,7 +221,8 @@ class SkillRegistry:
             "applescript": AppleScriptSkill(),
             "web_search": WebSearchSkill(),
             "clipboard": ClipboardSkill(),
-            "communication": CommunicationSkill()
+            "communication": CommunicationSkill(),
+            "notify": NotificationSkill()
         }
     def register(self, name: str, skill: Skill):
         self._skills[name] = skill

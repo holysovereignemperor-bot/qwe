@@ -1,30 +1,29 @@
 #!/bin/bash
-echo "🚀 OMNIAGENT OS: ELITE MONOLITH SETUP..."
+echo "🚀 OMNIAGENT OS: TRANSCENDENCE EDITION SETUP..."
 
-# 1. System Check
-OS_TYPE=$(uname -m)
-echo "💻 Detected Architecture: $OS_TYPE"
+# 1. Verification
+python3 --version || { echo "❌ Python 3 required"; exit 1; }
 
-# 2. Directory Architecture
+# 2. Workspace
 mkdir -p plugins knowledge/docs logs/history exports tests
 
 # 3. Dependencies
 pip install -r requirements.txt
-pip install py2app psutil
+pip install py2app psutil numpy
 
-# 4. Elite Templates
-cat > knowledge/daily_briefing.json <<EOF
+# 4. Neural Initializers
+cat > knowledge/default.json <<EOF
 {
-  "routine": "Research tech news, draft daily report, check GitHub notifications",
-  "priority": "high",
-  "preferred_sources": ["Hacker News", "GitHub Trending"]
+  "user_name": "Explorer",
+  "operating_system": "macOS",
+  "m1_optimization": true,
+  "edition": "Transcendence"
 }
 EOF
 
-# 5. Native HUD Requirements (conceptual)
-# Ensure PyObjC is fully linked
-python3 -c "import Cocoa; print('✅ Native macOS AppKit Linked')"
+# 5. Native Linked Verification
+python3 -c "import Cocoa; import Quartz; print('✅ Native macOS Neural Engines Linked')"
 
-echo "✅ ELITE SYSTEM READY."
+echo "✅ TRANSCENDENCE SYSTEM READY."
 echo "🚀 TO START: python3 main.py"
 echo "--------------------------------------------------"

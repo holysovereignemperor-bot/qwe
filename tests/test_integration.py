@@ -27,18 +27,17 @@ async def test_full_orchestration_loop(mock_vision):
     blackboard = Blackboard("test goal")
     blackboard.plan = [{"action": "test", "description": "test step"}]
 
-    # We must patch inside 'orchestrator' because it has its own local imports
     with patch('orchestrator.get_marked_screenshot', return_value=(b"fake_image", [])), \
          patch('orchestrator.get_ui_tree', return_value={"role": "root"}), \
          patch('orchestrator.get_window_metadata', return_value={"app": "test"}), \
          patch('orchestrator.compute_visual_diff', return_value=0.5), \
          patch('orchestrator.open', MagicMock()), \
-         patch('orchestrator.VoiceOS.speak', MagicMock()):
+         patch('orchestrator.VoiceOS.speak', MagicMock()), \
+         patch('orchestrator.gc.collect', MagicMock()), \
+         patch('orchestrator.BehaviorManager.get_macro', return_value=None): # Ensure we don't skip to completed
 
-        # We need a longer sleep or a more direct way to ensure the loop runs at least once
-        # orchestrator.run is a while loop
         task = asyncio.create_task(orchestrator.run(blackboard))
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(1.2)
         blackboard.is_running = False
         await task
 

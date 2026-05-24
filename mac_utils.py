@@ -47,7 +47,6 @@ def get_ui_tree():
     return parse_element(frontmost_app_ptr)
 
 def capture_screen_raw(display_id=None):
-    """Captures a display by ID. Defaults to main."""
     if not Quartz: return None
     if display_id is None: display_id = Quartz.CGMainDisplayID()
     image_ref = Quartz.CGDisplayCreateImage(display_id)
@@ -59,10 +58,12 @@ def capture_screen_raw(display_id=None):
     return img.convert("RGB")
 
 def get_marked_screenshot(quality=50, max_width=1024):
+    """Adaptive Perception: Dynamically adjusts based on input quality/width."""
     img = capture_screen_raw()
     if not img: return None, []
     ui_tree = get_ui_tree()
     if "error" in ui_tree: return capture_screen(quality, max_width), []
+
     elements = []
     def collect_elements(node):
         if "rect" in node and isinstance(node["rect"], dict):
@@ -70,9 +71,11 @@ def get_marked_screenshot(quality=50, max_width=1024):
         if "children" in node:
             for child in node["children"]: collect_elements(child)
     collect_elements(ui_tree)
+
     draw = ImageDraw.Draw(img)
     try: font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 20)
     except: font = ImageFont.load_default()
+
     marks = []
     for i, el in enumerate(elements[:100]):
         rect = el["rect"]
@@ -81,11 +84,13 @@ def get_marked_screenshot(quality=50, max_width=1024):
         draw.rectangle([x, y, x + 25, y + 25], fill="cyan")
         draw.text((x + 5, y + 2), str(i), fill="black", font=font)
         marks.append({"id": i, "role": el.get("role"), "title": el.get("title"), "rect": rect})
+
     img = img.convert("L").convert("RGB")
     native_w, native_h = img.size
     if native_w > max_width:
         ratio = max_width / float(native_w); new_height = int(float(native_h) * ratio)
         img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+
     buffer = BytesIO(); img.save(buffer, format="JPEG", quality=quality)
     gc.collect()
     return buffer.getvalue(), marks
@@ -143,7 +148,6 @@ def get_screen_dimensions():
     return f.size.width, f.size.height
 
 def get_all_displays():
-    """Detects all connected displays for multi-display perception."""
     if not Quartz: return [0]
     (err, displays, count) = Quartz.CGGetActiveDisplayList(10, None, None)
     return displays if err == 0 else [Quartz.CGMainDisplayID()]

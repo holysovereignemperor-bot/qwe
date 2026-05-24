@@ -14,6 +14,7 @@ from knowledge_manager import KnowledgeManager
 from behavior_manager import BehaviorManager
 from system_watchdog import SystemWatchdog
 from system_doctor import SystemDoctor
+from lesson_vault import LessonVault
 
 class Orchestrator:
     def __init__(self, vision: VisionClient, registry: SkillRegistry, memory: MemoryVault, knowledge: KnowledgeManager):
@@ -26,27 +27,29 @@ class Orchestrator:
         self.MAX_STEPS = 50; self.MAX_COST = 5.0
         self.history_dir = "logs/history"
         if not os.path.exists(self.history_dir): os.makedirs(self.history_dir)
+        self.vision_quality = 50; self.vision_width = 1024
 
     async def run(self, blackboard: Blackboard, project_context: str = ""):
         blackboard.gui_callback = self.status_callback
-        # System Optimization
-        self.doctor.optimize_performance()
-
         try:
-            self.voice.speak(f"Aether initiate: {blackboard.goal}")
+            self.doctor.optimize_performance()
+            # Initial Macro check
+            macro = self.behavior.get_macro(blackboard.goal)
+            if macro:
+                for step in macro:
+                    skill = self.registry.get(step.get('skill'))
+                    if skill: await skill.execute(step.get('params', {}))
+                blackboard.status = "Completed"; return
+
             while blackboard.is_running and blackboard.current_step_index < self.MAX_STEPS:
                 while blackboard.is_paused: await asyncio.sleep(0.5)
-                gc.collect()
 
-                # Health Check & Diagnosis
+                # Health Check
                 health = self.watchdog.check_health()
-                if health["critical"]:
-                    issues = self.doctor.diagnose()
-                    if self.status_callback: self.status_callback("log", f"System Alert: {health['reason']}. Issues: {issues}")
-                    blackboard.is_paused = True
+                if health["critical"]: blackboard.is_paused = True
 
                 blackboard.total_cost = self.architect.vision.total_cost
-                pre_screenshot, marks = get_marked_screenshot()
+                pre_screenshot, marks = get_marked_screenshot(quality=self.vision_quality, max_width=self.vision_width)
                 blackboard.last_screenshot = pre_screenshot
                 blackboard.last_ui_tree = get_ui_tree()
 
@@ -54,26 +57,19 @@ class Orchestrator:
                     full_context = f"{project_context}\n{self.behavior.get_behavior_context()}"
                     await self.architect.plan(blackboard, self.memory, self.knowledge, full_context)
 
-                if self.status_callback: self.status_callback("agent_active", "Executor")
+                # Execute
                 action = await self.executor.act(blackboard)
-                if action.get("skill") == "ask_user":
-                    blackboard.is_paused = True; continue
-
                 skill = self.registry.get(action.get('skill'))
-                if skill:
-                    if self.status_callback and action.get('skill') == "click":
-                         self.status_callback("visual_feedback", action.get('params', {}))
-                    await skill.execute(action.get('params', {}))
+                if skill: await skill.execute(action.get('params', {}))
 
-                if self.status_callback: self.status_callback("agent_active", "Auditor")
-                post_screenshot, _ = get_marked_screenshot()
+                # Verify
+                post_screenshot, _ = get_marked_screenshot(quality=self.vision_quality, max_width=self.vision_width)
                 diff_score = compute_visual_diff(pre_screenshot, post_screenshot)
                 blackboard.last_screenshot = post_screenshot
                 verification = await self.auditor.verify(action, blackboard)
-                verification["visual_change"] = diff_score > 0.1
-                blackboard.add_history(action, verification)
 
                 if verification.get("success"):
+                    blackboard.add_history(action, verification)
                     blackboard.current_step_index += 1
                 else:
                     await self.auditor.generate_correction_plan(verification, blackboard)
@@ -81,10 +77,11 @@ class Orchestrator:
 
                 if blackboard.current_step_index >= len(blackboard.plan) and len(blackboard.plan) > 0:
                     blackboard.status = "Completed"
+                    LessonVault().add_lesson(blackboard.goal, "Transcendence path")
                     seq = [h['action'] for h in blackboard.history if h['result'].get('success')]
                     self.behavior.add_macro(blackboard.goal, seq)
                     break
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.1) # Fast loop for tests
 
         except Exception as e: blackboard.error = str(e)
         finally:

@@ -3,6 +3,7 @@ from vision_client import VisionClient
 from blackboard import Blackboard
 from memory_vault import MemoryVault
 from knowledge_manager import KnowledgeManager
+from lesson_vault import LessonVault
 
 class Agent:
     def __init__(self, vision: VisionClient):
@@ -10,21 +11,21 @@ class Agent:
 
 class ArchitectAgent(Agent):
     async def plan(self, blackboard: Blackboard, memory: MemoryVault, knowledge: KnowledgeManager, project_context: str = ""):
+        # Transcendence: Use Lessons + Memory + Docs
+        lessons = LessonVault().get_lessons(blackboard.goal)
         doc_context = knowledge.search_docs(blackboard.goal)
         similar = memory.retrieve_similar(blackboard.goal)
-        full_context = f"{project_context}\nDocs: {json.dumps(doc_context)}\nMemory: {json.dumps(similar)}"
+
+        full_context = f"{project_context}\nNeural Lessons: {json.dumps(lessons)}\nDocs: {json.dumps(doc_context)}\nMemory: {json.dumps(similar)}"
 
         if hasattr(blackboard, "correction_plan") and blackboard.correction_plan:
             full_context += f"\nCORRECTION: {blackboard.correction_plan}"
 
-        # Tree-of-Thought (ToT): Generate multiple candidates
         candidates = []
-        for i in range(2): # 2 paths for M1 efficiency
+        for i in range(2):
             p = await self.vision.get_plan(goal=blackboard.goal, screenshot=blackboard.last_screenshot, ui_tree_summary=json.dumps(blackboard.last_ui_tree), context=full_context)
             candidates.append(p)
 
-        # Evaluator: Pick the shortest/cleanest plan
-        # In production, this would be another LLM call to evaluate the paths
         best_plan = min(candidates, key=len)
         blackboard.plan = best_plan
         blackboard.status = "Executing"
