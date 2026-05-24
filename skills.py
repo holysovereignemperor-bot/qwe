@@ -1,8 +1,10 @@
 import os
 import subprocess
 import shlex
+import io
+import contextlib
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 class Skill(ABC):
     @abstractmethod
@@ -11,14 +13,14 @@ class Skill(ABC):
 
 class ClickSkill(Skill):
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        from mac_utils import simulate_click, scale_coordinate
-        x, y = params.get('x'), params.get('y')
-        # vision_client uses 1024px width
-        # We need the aspect ratio to determine the virtual height used by the LLM
-        from mac_utils import get_screen_dimensions
+        from mac_utils import simulate_click, scale_coordinate, get_screen_dimensions
+        x = params.get('x')
+        y = params.get('y')
+        if x is None or y is None:
+            return {"status": "error", "error": "Missing x or y coordinates"}
+
         sw, sh = get_screen_dimensions()
         v_height = (1024 * sh) / sw
-
         sx, sy = scale_coordinate(x, y, 1024, v_height)
         simulate_click(sx, sy)
         return {"status": "success", "action": f"Clicked at {x}, {y}"}
@@ -28,7 +30,7 @@ class TypeSkill(Skill):
         from mac_utils import simulate_type
         text = params.get('text', '')
         simulate_type(text)
-        return {"status": "success", "action": f"Typed text"}
+        return {"status": "success", "action": "Typed text"}
 
 class TerminalSkill(Skill):
     BLACKLIST = ["rm -rf /", "sudo", "mkfs", "dd"]
@@ -53,13 +55,10 @@ class FileSystemSkill(Skill):
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         action = params.get('action')
         path = params.get('path')
-
         if not path:
              return {"status": "error", "error": "No path provided"}
-
         if ".." in path:
              return {"status": "blocked", "reason": "Security guardrail: Directory traversal detected"}
-
         try:
             if action == "read":
                 with open(path, 'r') as f:
@@ -74,81 +73,39 @@ class FileSystemSkill(Skill):
             return {"status": "error", "error": str(e)}
 
 class ExecuteCodeSkill(Skill):
-    """Allows autonomous Python code execution in a controlled environment."""
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         code = params.get('code', '')
         if not code:
             return {"status": "error", "error": "No code provided"}
-
-        # Security: Basic check for very dangerous builtins
-        if "eval(" in code or "exec(" in code or "import os" in code:
-            # We allow it for now since we are in a local agent,
-            # but in production this should be strictly sandboxed.
-            pass
-
-        import io
-        import contextlib
-
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-
+        stdout, stderr = io.StringIO(), io.StringIO()
         try:
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-                # We provide a clean global dict but allow some imports
-                exec_globals = {"__builtins__": __builtins__}
-                exec(code, exec_globals)
-
-            return {
-                "status": "success",
-                "stdout": stdout.getvalue(),
-                "stderr": stderr.getvalue()
-            }
+                exec(code, {"__builtins__": __builtins__})
+            return {"status": "success", "stdout": stdout.getvalue(), "stderr": stderr.getvalue()}
         except Exception as e:
-            return {
-                "status": "error",
-                "error": str(e),
-                "stdout": stdout.getvalue(),
-                "stderr": stderr.getvalue()
-            }
+            return {"status": "error", "error": str(e), "stdout": stdout.getvalue(), "stderr": stderr.getvalue()}
 
 class GithubSkill(Skill):
-    """Integrates Git operations into the agent."""
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         from github_manager import GithubManager
         gh = GithubManager()
-        action = params.get("action")
-        args = params.get("args", [])
-        cwd = params.get("cwd", ".")
-
+        action, args, cwd = params.get("action"), params.get("args", []), params.get("cwd", ".")
         if action == "git":
             return gh.run_git(args, cwd)
         elif action == "pr":
-            return gh.create_pull_request(
-                repo=params.get("repo"),
-                title=params.get("title"),
-                head=params.get("head"),
-                body=params.get("body", "")
-            )
+            return gh.create_pull_request(repo=params.get("repo"), title=params.get("title"), head=params.get("head"), body=params.get("body", ""))
         return {"status": "error", "error": f"Unknown github action: {action}"}
 
 class PluginGeneratorSkill(Skill):
-    """Allows the agent to self-evolve by writing its own skill plugins."""
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        name = params.get("name")
-        code = params.get("code")
-        plugin_dir = "plugins"
-
+        name, code = params.get("name"), params.get("code")
         if not name or not code:
             return {"status": "error", "error": "Missing name or code"}
-
-        if not os.path.exists(plugin_dir):
-            os.makedirs(plugin_dir)
-
-        path = os.path.join(plugin_dir, f"{name}.py")
+        path = os.path.join("plugins", f"{name}.py")
         try:
             with open(path, "w") as f:
                 f.write(code)
-            return {"status": "success", "message": f"Skill plugin '{name}' generated and saved."}
+            return {"status": "success", "message": f"Skill plugin '{name}' generated."}
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
@@ -163,9 +120,7 @@ class SkillRegistry:
             "github": GithubSkill(),
             "generate_skill": PluginGeneratorSkill()
         }
-
     def register(self, name: str, skill: Skill):
         self._skills[name] = skill
-
     def get(self, name: str) -> Skill:
         return self._skills.get(name)

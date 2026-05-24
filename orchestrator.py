@@ -28,6 +28,9 @@ class Orchestrator:
             while blackboard.is_running and blackboard.current_step_index < self.MAX_STEPS:
                 gc.collect()
 
+                # Update total cost from vision client consistently
+                blackboard.total_cost = self.architect.vision.total_cost
+
                 if blackboard.total_cost > self.MAX_COST:
                     blackboard.error = "Circuit breaker: Cost limit exceeded"
                     break
@@ -37,15 +40,14 @@ class Orchestrator:
                 blackboard.last_ui_tree = get_ui_tree()
                 meta = get_window_metadata()
 
-                # Enrich context with visual marks
-                visual_context = f"Visual Marks (IDs on screenshot): {json.dumps(marks[:20])}..." # Summary for tokens
-                full_context = f"{project_context}\n{visual_context}\nWindow Metadata: {json.dumps(meta)}"
+                visual_context = f"Visual Marks: {json.dumps(marks[:10])}..."
+                full_context = f"{project_context}\n{visual_context}\nMetadata: {json.dumps(meta)}"
 
                 # 2. Plan
                 if not blackboard.plan:
                     await self.architect.plan(blackboard, self.memory, full_context)
                     if self.status_callback:
-                        self.status_callback("log", f"Architect generated plan: {len(blackboard.plan)} steps")
+                        self.status_callback("log", f"Architect generated plan.")
                     if not blackboard.plan:
                         blackboard.error = "Planning failed"
                         break
@@ -80,25 +82,20 @@ class Orchestrator:
                     blackboard.current_step_index += 1
                 else:
                     self.auditor.reflect_on_outcome(verification)
-                    if self.status_callback:
-                        self.status_callback("log", f"Verification failed: {verification.get('reflection')}")
 
                 if blackboard.current_step_index >= len(blackboard.plan):
                     blackboard.status = "Completed"
                     self.memory.save_experience(blackboard.goal, blackboard.plan, True)
                     break
 
-                blackboard.total_cost = self.architect.vision.total_cost
                 await asyncio.sleep(0.5)
 
         except Exception as e:
             blackboard.error = f"Orchestration crash: {str(e)}"
-            if self.status_callback:
-                self.status_callback("log", f"CRASH: {str(e)}")
             blackboard.is_running = False
         finally:
             blackboard.is_running = False
             blackboard.status = "Finished"
-            report_path = self.reporter.generate_report(blackboard)
-            if self.status_callback:
-                self.status_callback("log", f"Final report generated at: {report_path}")
+            # Ensure final cost is recorded
+            blackboard.total_cost = self.architect.vision.total_cost
+            self.reporter.generate_report(blackboard)

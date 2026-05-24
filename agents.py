@@ -9,6 +9,7 @@ class Agent:
 
 class ArchitectAgent(Agent):
     async def plan(self, blackboard: Blackboard, memory: MemoryVault, project_context: str = ""):
+        # Check memory for similar tasks
         similar = memory.retrieve_similar(blackboard.goal)
         context = project_context
         if similar:
@@ -25,6 +26,10 @@ class ArchitectAgent(Agent):
 
 class ExecutorAgent(Agent):
     async def act(self, blackboard: Blackboard):
+        # Safety check
+        if not blackboard.plan or blackboard.current_step_index >= len(blackboard.plan):
+            return {"skill": "error", "error": "No plan step available"}
+
         step = blackboard.plan[blackboard.current_step_index]
         action = await self.vision.get_action(
             step=step,
@@ -34,9 +39,9 @@ class ExecutorAgent(Agent):
         return action
 
     async def self_repair(self, error: str, blackboard: Blackboard):
-        # Improved self-repair could ask the LLM for a workaround
+        # In a production system, this would be an LLM-driven repair
         print(f"Self-repairing error: {error}")
-        return {"skill": "command", "params": {"cmd": f"echo 'Detected error: {error}. Attempting workaround...'"}}
+        return {"skill": "command", "params": {"cmd": f"echo 'Repairing: {error}'"}}
 
 class AuditorAgent(Agent):
     async def verify(self, last_action, blackboard: Blackboard):
@@ -48,13 +53,7 @@ class AuditorAgent(Agent):
         return verification
 
     def reflect_on_outcome(self, result: dict):
-        """Causal analysis of the outcome with specific fix suggestions."""
         if not result.get("success"):
-             observation = result.get('observation', 'None')
-             reflection = result.get('reflection', 'Unknown cause')
-             print(f"--- Auditor Reflection ---")
-             print(f"Observation: {observation}")
-             print(f"Causal Analysis: {reflection}")
-             # We could return a structured repair hint to the Orchestrator
-             return {"repair_hint": reflection, "retry_allowed": True}
+             print(f"Auditor Reflection: {result.get('reflection', 'Unknown issue')}")
+             return result.get('reflection')
         return None

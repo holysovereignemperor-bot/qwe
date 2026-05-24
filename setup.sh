@@ -1,15 +1,35 @@
 #!/bin/bash
-echo "🚀 Bootstrapping OmniAgent OS..."
+echo "🚀 INITIATING OMNIAGENT OS: TURNKEY SETUP..."
 
-# Check Python version
-python3 --version || { echo "Python 3 is required"; exit 1; }
+# 1. Environment Verification
+python3 --version || { echo "❌ Python 3 is required"; exit 1; }
 
-# Install dependencies
+# 2. Directory Structure
+echo "📁 Creating workspace architecture..."
+mkdir -p plugins knowledge exports logs tests
+
+# 3. Dependencies
+echo "📦 Installing neural and system dependencies..."
 pip install -r requirements.txt
 
-# Create necessary directories
-mkdir -p plugins knowledge exports logs
+# 4. Default Context
+echo "🧠 Initializing default knowledge profile..."
+cat > knowledge/default.json <<EOF
+{
+  "user_name": "Human",
+  "preferred_shell": "zsh",
+  "operating_system": "macOS",
+  "m1_optimization": true
+}
+EOF
 
-echo "✅ Environment ready."
-echo "⚠️  IMPORTANT: Please ensure 'Accessibility' permissions are granted to your Terminal/IDE in System Settings > Privacy & Security."
-echo "To run: python3 main.py"
+# 5. Permissions Guidance
+echo "--------------------------------------------------"
+echo "✅ SYSTEM READY FOR DAILY OPERATION."
+echo ""
+echo "⚠️  CRITICAL: macOS SECURITY SETUP"
+echo "1. Go to: System Settings > Privacy & Security > Accessibility"
+echo "2. Add and Enable your Terminal (e.g., iTerm2 or Terminal.app)"
+echo ""
+echo "🚀 TO START: python3 main.py"
+echo "--------------------------------------------------"

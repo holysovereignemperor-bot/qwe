@@ -24,18 +24,21 @@ class ReportGenerator:
 ## Execution Log
 """
         for h in blackboard.history:
-            action = h['action']
-            res = h['result']
-            report += f"### Step {h['step_index'] + 1}: {action.get('skill')}\n"
+            action = h.get('action', {})
+            res = h.get('result', {})
+            report += f"### Step {h.get('step_index', 0) + 1}: {action.get('skill', 'unknown')}\n"
             report += f"- **Action**: {json.dumps(action.get('params'))}\n"
             report += f"- **Outcome**: {'Success' if res.get('success') else 'Failure'}\n"
-            report += f"- **Observation**: {res.get('observation')}\n\n"
+            report += f"- **Observation**: {res.get('observation', 'N/A')}\n\n"
 
         if blackboard.error:
             report += f"## Error\n`{blackboard.error}`\n"
 
-        with open(path, 'w') as f:
-            f.write(report)
+        try:
+            with open(path, 'w') as f:
+                f.write(report)
+        except Exception:
+            pass
         return path
 
 def time_format(seconds):
