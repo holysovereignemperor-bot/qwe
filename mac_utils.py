@@ -9,9 +9,24 @@ try:
     import Cocoa
     import Quartz
     import ApplicationServices
-    from AppKit import NSScreen
+    from AppKit import NSScreen, NSWorkspace
 except ImportError:
-    Cocoa = Quartz = ApplicationServices = NSScreen = None
+    Cocoa = Quartz = ApplicationServices = NSScreen = NSWorkspace = None
+
+def get_window_metadata():
+    """Gathers metadata about the active application and windows."""
+    if not NSWorkspace:
+        return {}
+
+    workspace = NSWorkspace.sharedWorkspace()
+    active_app = workspace.frontmostApplication()
+
+    metadata = {
+        "active_app_name": active_app.localizedName(),
+        "bundle_id": active_app.bundleIdentifier(),
+        "pid": active_app.processIdentifier(),
+    }
+    return metadata
 
 def get_ui_tree():
     """Extracts the macOS Accessibility Tree and returns a summarized JSON."""
@@ -104,17 +119,14 @@ def is_trusted():
 import tkinter as tk
 
 class GhostOverlay:
-    """A transparent overlay to show visual feedback. Must be triggered on main thread if using Tkinter."""
     def __init__(self, master=None):
         self.master = master
         self.window = None
 
     def show_target(self, x, y, duration=1000):
-        """Schedules showing a target. Duration in ms."""
         if not self.master:
             return
 
-        # This part should be thread-safe if called via master.after
         def _show():
             self.window = tk.Toplevel(self.master)
             self.window.overrideredirect(True)
@@ -126,15 +138,13 @@ class GhostOverlay:
             canvas.pack()
             canvas.create_oval(5, 5, 45, 45, outline="white", width=2)
 
-            # Auto-destroy
             self.window.after(duration, self.window.destroy)
 
         self.master.after(0, _show)
 
 def get_screen_dimensions():
-    """Returns native screen width and height."""
     if not NSScreen:
-        return 1920, 1080 # Default
+        return 1920, 1080
     screen = NSScreen.mainScreen()
     if not screen:
         return 1920, 1080
@@ -142,20 +152,15 @@ def get_screen_dimensions():
     return frame.size.width, frame.size.height
 
 def scale_coordinate(x, y, from_width, from_height):
-    """Scales coordinates from vision/screenshot space to native screen space."""
     screen_w, screen_h = get_screen_dimensions()
-
     scale_x = screen_w / from_width
     scale_y = screen_h / from_height
-
     return x * scale_x, y * scale_y
 
 def simulate_click(x, y):
-    """Simulates a mouse click at native coordinates."""
     import pyautogui
     pyautogui.click(x, y)
 
 def simulate_type(text):
-    """Simulates typing text."""
     import pyautogui
     pyautogui.write(text, interval=0.05)

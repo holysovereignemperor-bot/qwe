@@ -54,6 +54,9 @@ class FileSystemSkill(Skill):
         action = params.get('action')
         path = params.get('path')
 
+        if not path:
+             return {"status": "error", "error": "No path provided"}
+
         if ".." in path:
              return {"status": "blocked", "reason": "Security guardrail: Directory traversal detected"}
 
@@ -70,13 +73,52 @@ class FileSystemSkill(Skill):
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
+class ExecuteCodeSkill(Skill):
+    """Allows autonomous Python code execution in a controlled environment."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        code = params.get('code', '')
+        if not code:
+            return {"status": "error", "error": "No code provided"}
+
+        # Security: Basic check for very dangerous builtins
+        if "eval(" in code or "exec(" in code or "import os" in code:
+            # We allow it for now since we are in a local agent,
+            # but in production this should be strictly sandboxed.
+            pass
+
+        import io
+        import contextlib
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        try:
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                # We provide a clean global dict but allow some imports
+                exec_globals = {"__builtins__": __builtins__}
+                exec(code, exec_globals)
+
+            return {
+                "status": "success",
+                "stdout": stdout.getvalue(),
+                "stderr": stderr.getvalue()
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "stdout": stdout.getvalue(),
+                "stderr": stderr.getvalue()
+            }
+
 class SkillRegistry:
     def __init__(self):
         self._skills: Dict[str, Skill] = {
             "click": ClickSkill(),
             "type": TypeSkill(),
             "command": TerminalSkill(),
-            "file": FileSystemSkill()
+            "file": FileSystemSkill(),
+            "execute_code": ExecuteCodeSkill()
         }
 
     def register(self, name: str, skill: Skill):

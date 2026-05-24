@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from blackboard import Blackboard
 
 class ReportGenerator:
@@ -18,7 +19,7 @@ class ReportGenerator:
 - **Status**: {blackboard.status}
 - **Total Cost**: ${blackboard.total_cost:.4f}
 - **Runtime**: {time_format(time.time() - blackboard.start_time)}
-- **Steps Completed**: {blackboard.current_step_index}/{len(blackboard.plan)}
+- **Steps Completed**: {blackboard.current_step_index}/{len(blackboard.plan) if blackboard.plan else 0}
 
 ## Execution Log
 """

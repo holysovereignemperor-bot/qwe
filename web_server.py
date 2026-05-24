@@ -1,5 +1,6 @@
 import os
 import asyncio
+import threading
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from blackboard import Blackboard
@@ -56,7 +57,11 @@ def run_server(blackboard: Blackboard, port=8080):
     global _current_blackboard
     _current_blackboard = blackboard
     import uvicorn
-    # In a real app, this would run in a separate thread/process
+
     config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="error")
     server = uvicorn.Server(config)
+
+    # Start server in a background thread
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
     return server

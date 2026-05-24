@@ -9,7 +9,6 @@ class Agent:
 
 class ArchitectAgent(Agent):
     async def plan(self, blackboard: Blackboard, memory: MemoryVault, project_context: str = ""):
-        # Check memory for similar tasks
         similar = memory.retrieve_similar(blackboard.goal)
         context = project_context
         if similar:
@@ -35,10 +34,9 @@ class ExecutorAgent(Agent):
         return action
 
     async def self_repair(self, error: str, blackboard: Blackboard):
-        # Logic to try an alternative approach if a skill fails
+        # Improved self-repair could ask the LLM for a workaround
         print(f"Self-repairing error: {error}")
-        # In a real system, this would ask the LLM for a new action based on the error
-        return {"skill": "command", "params": {"cmd": "echo 'Retrying with alternative approach...'"}}
+        return {"skill": "command", "params": {"cmd": f"echo 'Detected error: {error}. Attempting workaround...'"}}
 
 class AuditorAgent(Agent):
     async def verify(self, last_action, blackboard: Blackboard):
@@ -50,6 +48,13 @@ class AuditorAgent(Agent):
         return verification
 
     def reflect_on_outcome(self, result: dict):
-        """Causal analysis of the outcome."""
+        """Causal analysis of the outcome with specific fix suggestions."""
         if not result.get("success"):
-             print(f"Reflection: {result.get('reflection', 'Unknown cause')}")
+             observation = result.get('observation', 'None')
+             reflection = result.get('reflection', 'Unknown cause')
+             print(f"--- Auditor Reflection ---")
+             print(f"Observation: {observation}")
+             print(f"Causal Analysis: {reflection}")
+             # We could return a structured repair hint to the Orchestrator
+             return {"repair_hint": reflection, "retry_allowed": True}
+        return None
