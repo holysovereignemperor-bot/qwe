@@ -13,14 +13,16 @@ class ArchitectAgent(Agent):
         doc_context = knowledge.search_docs(blackboard.goal)
         similar = memory.retrieve_similar(blackboard.goal)
 
-        # UI callback for memory hits
         if similar and hasattr(blackboard, "gui_callback") and blackboard.gui_callback:
-            for hit in similar:
-                blackboard.gui_callback("memory_hit", hit)
+            for hit in similar: blackboard.gui_callback("memory_hit", hit)
 
         full_context = project_context
         if doc_context: full_context += "\nRelevant Docs:\n" + json.dumps(doc_context)
         if similar: full_context += "\nNeural Memory:\n" + json.dumps(similar)
+
+        # Integration of Correction Plan from Auditor
+        if hasattr(blackboard, "correction_plan") and blackboard.correction_plan:
+            full_context += f"\nAUDITOR CORRECTION PLAN (CRITICAL):\n{blackboard.correction_plan}"
 
         plan = await self.vision.get_plan(
             goal=blackboard.goal,
@@ -39,15 +41,22 @@ class ExecutorAgent(Agent):
         return await self.vision.get_action(step=step, screenshot=blackboard.last_screenshot, ui_tree_summary=json.dumps(blackboard.last_ui_tree))
 
     async def self_repair(self, error: str, blackboard: Blackboard):
-        print(f"Self-Repairing: {error}")
         if "ModuleNotFoundError" in error or "command not found" in error:
             missing = error.split("'")[-2] if "'" in error else "package"
             return {"skill": "command", "params": {"cmd": f"pip install {missing} || brew install {missing}"}}
-        return {"skill": "command", "params": {"cmd": f"echo 'Repair attempt for: {error}'"}}
+        return {"skill": "command", "params": {"cmd": f"echo 'Repairing: {error}'"}}
 
 class AuditorAgent(Agent):
     async def verify(self, last_action, blackboard: Blackboard):
         return await self.vision.verify_outcome(last_action=last_action, screenshot=blackboard.last_screenshot, ui_tree_summary=json.dumps(blackboard.last_ui_tree))
+
+    async def generate_correction_plan(self, failed_result: dict, blackboard: Blackboard):
+        """Recursive Reasoning: Auditor generates a specific fix for the Architect."""
+        prompt = f"The last action failed. Observation: {failed_result.get('observation')}. Reflection: {failed_result.get('reflection')}. Generate a 1-sentence technical instruction for the planner to fix this."
+        # Using vision client as a general LLM proxy for simplicity here
+        correction = await self.vision._call_vision(prompt, blackboard.last_screenshot, "You are a Senior Debugger.")
+        blackboard.correction_plan = correction
+        return correction
 
     def reflect_on_outcome(self, result: dict):
         if not result.get("success"):

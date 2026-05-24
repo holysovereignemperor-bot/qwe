@@ -1,35 +1,46 @@
 #!/bin/bash
-echo "🚀 INITIATING OMNIAGENT OS: TURNKEY SETUP..."
+echo "🚀 OMNIAGENT OS: GENESIS EDITION SETUP..."
 
 # 1. Environment Verification
 python3 --version || { echo "❌ Python 3 is required"; exit 1; }
 
 # 2. Directory Structure
-echo "📁 Creating workspace architecture..."
-mkdir -p plugins knowledge exports logs tests
+echo "📁 Creating Genesis Architecture..."
+mkdir -p plugins knowledge/docs logs/history exports tests
 
 # 3. Dependencies
-echo "📦 Installing neural and system dependencies..."
+echo "📦 Installing Genesis dependencies..."
 pip install -r requirements.txt
+pip install py2app # For packaging support
 
 # 4. Default Context
-echo "🧠 Initializing default knowledge profile..."
+echo "🧠 Initializing Genesis knowledge..."
 cat > knowledge/default.json <<EOF
 {
   "user_name": "Human",
-  "preferred_shell": "zsh",
   "operating_system": "macOS",
-  "m1_optimization": true
+  "m1_optimization": true,
+  "edition": "Genesis"
 }
 EOF
 
-# 5. Permissions Guidance
-echo "--------------------------------------------------"
-echo "✅ SYSTEM READY FOR DAILY OPERATION."
-echo ""
-echo "⚠️  CRITICAL: macOS SECURITY SETUP"
-echo "1. Go to: System Settings > Privacy & Security > Accessibility"
-echo "2. Add and Enable your Terminal (e.g., iTerm2 or Terminal.app)"
+# 5. Native Packaging Concept (Concept only, run manually if needed)
+cat > setup_app.py <<EOF
+from setuptools import setup
+APP = ['main.py']
+DATA_FILES = ['knowledge', 'plugins']
+OPTIONS = {
+    'argv_emulation': True,
+    'plist': {
+        'LSUIElement': True,
+    },
+    'packages': ['customtkinter', 'PIL', 'openai', 'fastapi', 'uvicorn'],
+}
+setup(app=APP, data_files=DATA_FILES, options={'py2app': OPTIONS}, setup_requires=['py2app'])
+EOF
+
+echo "✅ GENESIS SYSTEM READY."
 echo ""
 echo "🚀 TO START: python3 main.py"
+echo "📦 TO PACKAGE: python3 setup_app.py py2app"
 echo "--------------------------------------------------"
