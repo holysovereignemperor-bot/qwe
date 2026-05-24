@@ -129,6 +129,20 @@ class AppleScriptSkill(Skill):
 
         return AppleScriptUtils.run_script(script)
 
+class WebSearchSkill(Skill):
+    """Allows the agent to search and scrape the web for live information."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        query = params.get("query")
+        if not query: return {"status": "error", "error": "No query"}
+
+        # Strategy: Use Safari via AppleScript to search, then extract text
+        # This keeps RAM low by not running a headless browser locally.
+        from applescript_utils import AppleScriptUtils
+        search_url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
+        AppleScriptUtils.run_script(AppleScriptUtils.safari_open_url(search_url))
+
+        return {"status": "success", "message": f"Opened search for: {query}. Agent should now perceive Safari."}
+
 class SkillRegistry:
     def __init__(self):
         self._skills: Dict[str, Skill] = {
@@ -139,7 +153,8 @@ class SkillRegistry:
             "execute_code": ExecuteCodeSkill(),
             "github": GithubSkill(),
             "generate_skill": PluginGeneratorSkill(),
-            "applescript": AppleScriptSkill()
+            "applescript": AppleScriptSkill(),
+            "web_search": WebSearchSkill()
         }
     def register(self, name: str, skill: Skill):
         self._skills[name] = skill

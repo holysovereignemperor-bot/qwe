@@ -1,46 +1,30 @@
 #!/bin/bash
-echo "🚀 OMNIAGENT OS: GENESIS EDITION SETUP..."
+echo "🚀 OMNIAGENT OS: ELITE MONOLITH SETUP..."
 
-# 1. Environment Verification
-python3 --version || { echo "❌ Python 3 is required"; exit 1; }
+# 1. System Check
+OS_TYPE=$(uname -m)
+echo "💻 Detected Architecture: $OS_TYPE"
 
-# 2. Directory Structure
-echo "📁 Creating Genesis Architecture..."
+# 2. Directory Architecture
 mkdir -p plugins knowledge/docs logs/history exports tests
 
 # 3. Dependencies
-echo "📦 Installing Genesis dependencies..."
 pip install -r requirements.txt
-pip install py2app # For packaging support
+pip install py2app psutil
 
-# 4. Default Context
-echo "🧠 Initializing Genesis knowledge..."
-cat > knowledge/default.json <<EOF
+# 4. Elite Templates
+cat > knowledge/daily_briefing.json <<EOF
 {
-  "user_name": "Human",
-  "operating_system": "macOS",
-  "m1_optimization": true,
-  "edition": "Genesis"
+  "routine": "Research tech news, draft daily report, check GitHub notifications",
+  "priority": "high",
+  "preferred_sources": ["Hacker News", "GitHub Trending"]
 }
 EOF
 
-# 5. Native Packaging Concept (Concept only, run manually if needed)
-cat > setup_app.py <<EOF
-from setuptools import setup
-APP = ['main.py']
-DATA_FILES = ['knowledge', 'plugins']
-OPTIONS = {
-    'argv_emulation': True,
-    'plist': {
-        'LSUIElement': True,
-    },
-    'packages': ['customtkinter', 'PIL', 'openai', 'fastapi', 'uvicorn'],
-}
-setup(app=APP, data_files=DATA_FILES, options={'py2app': OPTIONS}, setup_requires=['py2app'])
-EOF
+# 5. Native HUD Requirements (conceptual)
+# Ensure PyObjC is fully linked
+python3 -c "import Cocoa; print('✅ Native macOS AppKit Linked')"
 
-echo "✅ GENESIS SYSTEM READY."
-echo ""
+echo "✅ ELITE SYSTEM READY."
 echo "🚀 TO START: python3 main.py"
-echo "📦 TO PACKAGE: python3 setup_app.py py2app"
 echo "--------------------------------------------------"

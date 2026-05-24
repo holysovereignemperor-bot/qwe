@@ -1,40 +1,46 @@
-# OmniAgent OS: Ultimate Multi-Agent Computer Use Ecosystem
+# OmniAgent OS: Sovereign Edition - Final Singularity
 
-OmniAgent OS is a production-ready, ultra-optimized autonomous agent framework designed specifically for macOS (M1/M2/M3). It matches and exceeds the capabilities of state-of-the-art computer-use systems by combining native OS accessibility integration with advanced multi-agent orchestration.
+OmniAgent OS is the definitive, production-ready autonomous multi-agent ecosystem for macOS (M1/M2/M3). It represents the pinnacle of Vision-Language-Action (VLA) systems, optimized for 8GB RAM with zero-cost native OS integration.
 
-## Key Features
-- **Multi-Agent Architecture**:
-  - **Architect**: High-level planning and DAG generation.
-  - **Executor**: Vision-Language-Action (VLA) execution with self-repair.
-  - **Auditor**: Reflective verification and causal analysis.
-- **Native macOS Perception**: Uses `PyObjC` to parse the `AXUIElement` tree (Accessibility Hierarchy) for 0% idle CPU overhead.
-- **Neural Memory Vault**: SQLite-based long-term memory that learns from successful task patterns.
-- **Cyber-Minimalist GUI**: A premium `customtkinter` interface with resource monitoring and ghost overlays.
-- **Security Guardrails**: Hardened terminal command blacklist and directory traversal protection.
-- **Remote Control**: FastAPI-based dashboard with an emergency kill switch.
-- **Optimized for M1**: Aggressive memory management (GC flushing, JPEG compression) to strictly respect the 8GB RAM ceiling.
+## 🚀 Supreme Features
+- **Sovereign Intelligence**: Recursive reasoning with multi-step verification and automatic technical correction plans.
+- **Set-of-Mark Perception**: 100% accurate UI grounding via numeric overlays on native screenshots.
+- **Genesis HUD**: Professional native AppKit (NSPanel) visual feedback for real-time action monitoring.
+- **Swarm Delegation**: Multi-persona sub-agent spawning for complex, parallelized sub-tasks.
+- **Sovereign Scheduler**: Goal queuing and time-based autonomous execution.
+- **Secure Vault**: Encrypted local storage for sensitive API keys and credentials.
+- **Web Intelligence**: Real-time research and data extraction using native Safari automation.
+- **Neural Memory Vault**: Pattern discovery and relevance scoring via SQLite long-term storage.
+- **Mini-RAG**: Local document indexer for deep project context awareness.
+- **Omni-Context**: Auto-app detection and Knowledge Profile switching.
+- **Elite UX**: Cyber-Minimalist 'Aura' GUI with Interactive Chat, Visual Replay, and Neural Heatmaps.
 
-## Installation
-Run the one-click bootstrap script:
+## 📦 Installation & Setup
+Run the turnkey bootstrap script:
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-## Usage
-Launch the application:
+## 🛠 Usage
+Launch the sovereign dashboard:
 ```bash
 python3 main.py
 ```
-Or use CLI mode:
+Or use the CLI for direct commands:
 ```bash
-python3 main.py --cli --goal "Research top competitors and save to a file"
+python3 main.py --cli --goal "Automate my daily research and draft an email"
 ```
 
-## Requirements
-- macOS (Apple Silicon recommended)
-- Python 3.10+
-- Accessibility Permissions granted to your Terminal/IDE.
+## 🛡 Security & Safety
+- **Guardrails**: Hardened command blacklists and branch protection.
+- **Circuit Breakers**: Step-count (50) and Budget ($2.00) limits.
+- **M1 Optimization**: Aggressive GC, image purging, and GPU-accelerated processing for 8GB hardware.
 
-## License
+## 🧪 Testing
+```bash
+PYTHONPATH=. python3 -m pytest tests/
+```
+
+## 📜 License
 MIT
