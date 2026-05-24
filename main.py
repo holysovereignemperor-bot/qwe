@@ -1,4 +1,3 @@
-import os
 import asyncio
 import sys
 import argparse
@@ -19,21 +18,22 @@ def main():
     parser.add_argument("--cli", action="store_true", help="Run in CLI mode")
     parser.add_argument("--goal", type=str, help="Goal for the agent")
     parser.add_argument("--profile", type=str, help="Knowledge profile", default="default")
-    parser.add_argument("--persona", type=str, help="Senior Engineer, Executive Assistant, Research Scientist")
+    parser.add_argument("--persona", type=str, help="Persona: Senior Engineer, Executive Assistant, etc.")
     args = parser.parse_args()
 
-    # 1. Initialize
+    # 1. Initialize Core
     vision = VisionClient()
     memory = MemoryVault()
     registry = SkillRegistry()
     loader = PluginLoader(registry); loader.load_plugins()
 
     knowledge = KnowledgeManager()
-    project = ProjectManager()
+    project = ProjectManager(knowledge) # Integrated with KM
     rules = RuleManager()
 
     if args.persona: rules.update_rule("persona", args.persona)
 
+    # Initial Context
     profile_data = knowledge.get_profile(args.profile)
     knowledge_context = f"Profile ({args.profile}): {profile_data}" if profile_data else ""
     rules_context = rules.get_rules_context()
@@ -45,14 +45,22 @@ def main():
         if not args.goal: return
         blackboard = Blackboard(args.goal)
         run_server(blackboard)
+
+        # Check for auto-switch immediately
+        new_profile = project.auto_switch_context()
+        if new_profile:
+             knowledge_context = f"Auto-Switched Profile: {knowledge.get_profile(new_profile)}"
+
         full_context = f"{rules_context}\n{knowledge_context}\n{project.get_workspace_summary()}"
         asyncio.run(orchestrator.run(blackboard, full_context))
     else:
         from gui import OmniAgentGUI
         blackboard = Blackboard("")
         run_server(blackboard)
+
         app = OmniAgentGUI(orchestrator, blackboard)
         app.initial_context = f"{rules_context}\n{knowledge_context}\n{project.get_workspace_summary()}"
+        app.project_manager = project # Pass for background monitoring
         app.mainloop()
 
 if __name__ == "__main__": main()

@@ -10,13 +10,17 @@ class Agent:
 
 class ArchitectAgent(Agent):
     async def plan(self, blackboard: Blackboard, memory: MemoryVault, knowledge: KnowledgeManager, project_context: str = ""):
-        # Mini-RAG: Search local documents
         doc_context = knowledge.search_docs(blackboard.goal)
         similar = memory.retrieve_similar(blackboard.goal)
 
+        # UI callback for memory hits
+        if similar and hasattr(blackboard, "gui_callback") and blackboard.gui_callback:
+            for hit in similar:
+                blackboard.gui_callback("memory_hit", hit)
+
         full_context = project_context
-        if doc_context: full_context += "\nRelevant Local Docs:\n" + json.dumps(doc_context)
-        if similar: full_context += "\nPast Successful Patterns:\n" + json.dumps(similar)
+        if doc_context: full_context += "\nRelevant Docs:\n" + json.dumps(doc_context)
+        if similar: full_context += "\nNeural Memory:\n" + json.dumps(similar)
 
         plan = await self.vision.get_plan(
             goal=blackboard.goal,
@@ -35,8 +39,11 @@ class ExecutorAgent(Agent):
         return await self.vision.get_action(step=step, screenshot=blackboard.last_screenshot, ui_tree_summary=json.dumps(blackboard.last_ui_tree))
 
     async def self_repair(self, error: str, blackboard: Blackboard):
-        print(f"Self-repairing: {error}")
-        return {"skill": "command", "params": {"cmd": f"echo 'Attempting repair for: {error}'"}}
+        print(f"Self-Repairing: {error}")
+        if "ModuleNotFoundError" in error or "command not found" in error:
+            missing = error.split("'")[-2] if "'" in error else "package"
+            return {"skill": "command", "params": {"cmd": f"pip install {missing} || brew install {missing}"}}
+        return {"skill": "command", "params": {"cmd": f"echo 'Repair attempt for: {error}'"}}
 
 class AuditorAgent(Agent):
     async def verify(self, last_action, blackboard: Blackboard):
@@ -44,6 +51,5 @@ class AuditorAgent(Agent):
 
     def reflect_on_outcome(self, result: dict):
         if not result.get("success"):
-             print(f"Auditor Reflection: {result.get('reflection', 'Unknown issue')}")
              return result.get('reflection')
         return None

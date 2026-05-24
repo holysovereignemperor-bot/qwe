@@ -26,55 +26,42 @@ class Orchestrator:
 
         self.MAX_STEPS = 50
         self.MAX_COST = 2.0
-
         self.history_dir = "logs/history"
-        if not os.path.exists(self.history_dir):
-            os.makedirs(self.history_dir)
-
-    def _archive_screenshot(self, step: int, screenshot: bytes):
-        if screenshot:
-            path = os.path.join(self.history_dir, f"step_{step}.jpg")
-            with open(path, "wb") as f:
-                f.write(screenshot)
-            return path
-        return None
+        if not os.path.exists(self.history_dir): os.makedirs(self.history_dir)
 
     async def run(self, blackboard: Blackboard, project_context: str = ""):
+        # Link callback for Agent-to-GUI direct signaling
+        blackboard.gui_callback = self.status_callback
+
         try:
-            self.voice.speak(f"Initiating task: {blackboard.goal}")
+            self.voice.speak(f"Transcending task: {blackboard.goal}")
             while blackboard.is_running and blackboard.current_step_index < self.MAX_STEPS:
                 while blackboard.is_paused:
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.5);
                     if not blackboard.is_running: return
 
                 gc.collect()
                 blackboard.total_cost = self.architect.vision.total_cost
-
                 if blackboard.total_cost > self.MAX_COST:
-                    blackboard.error = "Circuit breaker: Cost limit exceeded"
-                    break
+                    blackboard.error = "Circuit breaker: Cost limit exceeded"; break
 
                 # 1. Perceive
                 blackboard.last_screenshot, marks = get_marked_screenshot()
                 blackboard.last_ui_tree = get_ui_tree()
                 meta = get_window_metadata()
 
-                # Archive for Visual Replay
-                archived_path = self._archive_screenshot(blackboard.current_step_index, blackboard.last_screenshot)
-                if self.status_callback:
-                    self.status_callback("visual_history", archived_path)
+                path = os.path.join(self.history_dir, f"step_{blackboard.current_step_index}.jpg")
+                with open(path, "wb") as f: f.write(blackboard.last_screenshot)
+                if self.status_callback: self.status_callback("visual_history", path)
 
-                visual_context = f"Visual Marks: {json.dumps(marks[:10])}..."
-                full_context = f"{project_context}\n{visual_context}\n{blackboard.get_context_summary()}\nMetadata: {json.dumps(meta)}"
+                full_context = f"{project_context}\nVisual Marks: {json.dumps(marks[:10])}\n{blackboard.get_context_summary()}\nMetadata: {json.dumps(meta)}"
 
                 # 2. Plan
                 if not blackboard.plan:
                     if self.status_callback: self.status_callback("agent_active", "PM")
                     await self.architect.plan(blackboard, self.memory, self.knowledge, full_context)
-                    if self.status_callback: self.status_callback("log", "Architect generated plan.")
-                    if not blackboard.plan:
-                        blackboard.error = "Planning failed"
-                        break
+                    if self.status_callback: self.status_callback("log", "Omega Architect plan ready.")
+                    if not blackboard.plan: blackboard.error = "Planning failed"; break
 
                 # 3. Execute
                 if self.status_callback: self.status_callback("agent_active", "Executor")
@@ -82,14 +69,13 @@ class Orchestrator:
 
                 if action.get("skill") == "ask_user":
                     blackboard.is_paused = True
-                    message = action.get("params", {}).get("question", "I need more information.")
+                    message = action.get("params", {}).get("question", "Input required.")
                     blackboard.add_chat("agent", message)
                     if self.status_callback: self.status_callback("clarification_required", message)
                     continue
 
                 skill_name = action.get('skill')
                 skill = self.registry.get(skill_name)
-
                 if skill:
                     if self.status_callback and skill_name == "click" and "params" in action:
                         self.status_callback("visual_feedback", action['params'])
@@ -106,28 +92,23 @@ class Orchestrator:
                 if self.status_callback: self.status_callback("agent_active", "Auditor")
                 blackboard.last_screenshot, _ = get_marked_screenshot()
                 blackboard.last_ui_tree = get_ui_tree()
-
                 verification = await self.auditor.verify(action, blackboard)
                 blackboard.add_history(action, verification)
 
-                if verification.get("success"):
-                    blackboard.current_step_index += 1
-                else:
-                    self.auditor.reflect_on_outcome(verification)
+                if verification.get("success"): blackboard.current_step_index += 1
+                else: self.auditor.reflect_on_outcome(verification)
 
                 if blackboard.current_step_index >= len(blackboard.plan):
                     blackboard.status = "Completed"
                     self.memory.save_experience(blackboard.goal, blackboard.plan, True)
-                    self.voice.speak("Task completed successfully.")
-                    break
+                    self.voice.speak("Omega task finalized."); break
 
                 await asyncio.sleep(0.5)
 
         except Exception as e:
-            blackboard.error = f"Orchestration crash: {str(e)}"
-            blackboard.is_running = False
+            blackboard.error = f"Omega crash: {str(e)}"; blackboard.is_running = False
         finally:
-            blackboard.is_running = False
-            blackboard.status = "Finished"
+            blackboard.is_running = False; blackboard.status = "Finished"
             blackboard.total_cost = self.architect.vision.total_cost
             self.reporter.generate_report(blackboard)
+            if self.status_callback: self.status_callback("agent_active", "None")

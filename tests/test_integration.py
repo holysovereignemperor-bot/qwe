@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 import json
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, patch
 from orchestrator import Orchestrator
 from blackboard import Blackboard
 from skills import SkillRegistry
@@ -25,17 +25,18 @@ async def test_full_orchestration_loop(mock_vision):
 
     orchestrator = Orchestrator(mock_vision, registry, memory, knowledge)
     blackboard = Blackboard("test goal")
+    blackboard.plan = [{"action": "test", "description": "test step"}]
 
-    import mac_utils
-    mac_utils.capture_screen = MagicMock(return_value=b"fake_image")
-    mac_utils.get_marked_screenshot = MagicMock(return_value=(b"fake_image", []))
-    mac_utils.get_ui_tree = MagicMock(return_value={"role": "root"})
-    mac_utils.get_window_metadata = MagicMock(return_value={"app": "test"})
+    with patch('orchestrator.get_marked_screenshot', return_value=(b"fake_image", [])), \
+         patch('orchestrator.get_ui_tree', return_value={"role": "root"}), \
+         patch('orchestrator.get_window_metadata', return_value={"app": "test"}), \
+         patch('orchestrator.open', MagicMock()), \
+         patch('orchestrator.VoiceOS.speak', MagicMock()):
 
-    task = asyncio.create_task(orchestrator.run(blackboard))
-    await asyncio.sleep(0.5)
-    blackboard.is_running = False
-    await task
+        task = asyncio.create_task(orchestrator.run(blackboard))
+        await asyncio.sleep(0.5)
+        blackboard.is_running = False
+        await task
 
     assert len(blackboard.history) > 0
     assert blackboard.status == "Finished"
