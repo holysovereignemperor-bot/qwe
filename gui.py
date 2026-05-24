@@ -16,8 +16,8 @@ class OmniAgentGUI(ctk.CTk):
 
         self.orchestrator.status_callback = self.handle_agent_event
 
-        self.title("OmniAgent OS - Singularity Edition")
-        self.geometry("1100x750")
+        self.title("OmniAgent OS - Singularity Edition Pro")
+        self.geometry("1200x800")
         ctk.set_appearance_mode("dark")
 
         self.grid_columnconfigure(0, weight=1)
@@ -27,11 +27,16 @@ class OmniAgentGUI(ctk.CTk):
         self.header = ctk.CTkFrame(self, height=80, fg_color="#0b0c10")
         self.header.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
 
-        self.goal_entry = ctk.CTkEntry(self.header, placeholder_text="Command the singularity...", width=600, fg_color="#1f2833", text_color="#fff", border_color="#00e5ff")
+        self.goal_entry = ctk.CTkEntry(self.header, placeholder_text="Command the agency Pro...", width=600, fg_color="#1f2833", text_color="#fff", border_color="#00e5ff")
         self.goal_entry.pack(side="left", padx=20, pady=15)
 
         self.run_btn = ctk.CTkButton(self.header, text="EXECUTE", fg_color="#00e5ff", text_color="#0b0c10", hover_color="#00ffa3", font=("SF Pro Display", 14, "bold"), command=self.start_task)
         self.run_btn.pack(side="left", padx=10)
+
+        # Voice Toggle
+        self.voice_var = ctk.BooleanVar(value=False)
+        self.voice_toggle = ctk.CTkSwitch(self.header, text="Voice Output", variable=self.voice_var, command=self.toggle_voice, progress_color="#00e5ff")
+        self.voice_toggle.pack(side="left", padx=20)
 
         self.resource_label = ctk.CTkLabel(self.header, text="CPU: 0% | RAM: 0MB | Cost: $0.00", text_color="#8b949e")
         self.resource_label.pack(side="right", padx=20)
@@ -40,12 +45,12 @@ class OmniAgentGUI(ctk.CTk):
         self.tabview = ctk.CTkTabview(self, fg_color="#0b0c10", segmented_button_selected_color="#00e5ff", segmented_button_selected_hover_color="#00ffa3")
         self.tabview.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
 
-        self.tab_live = self.tabview.add("Live Actions")
+        self.tab_live = self.tabview.add("Aura Actions")
         self.tab_memory = self.tabview.add("Neural Memory")
         self.tab_skills = self.tabview.add("Skill Factory")
         self.tab_explorer = self.tabview.add("Project Explorer")
 
-        # Live Actions Tab
+        # Aura Actions Tab
         self.tab_live.grid_columnconfigure((0,1,2), weight=1)
         self.tab_live.grid_rowconfigure(0, weight=1)
         self.pm_card = self.create_card(self.tab_live, "Product Manager", 0)
@@ -65,26 +70,28 @@ class OmniAgentGUI(ctk.CTk):
         self.explorer_list.pack(fill="both", expand=True, padx=10, pady=10)
         self.update_explorer()
 
-        # Bottom: Logs
-        self.log_box = ctk.CTkTextbox(self, height=120, fg_color="#1a1a1a", text_color="#00ffa3", font=("SF Mono", 11))
+        # Bottom: Monologue Console
+        self.log_box = ctk.CTkTextbox(self, height=150, fg_color="#1a1a1a", text_color="#00ffa3", font=("SF Mono", 11))
         self.log_box.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
 
         self.update_loop()
 
     def create_card(self, parent, title, col):
-        card = ctk.CTkFrame(parent, fg_color="#1f2833", border_width=1, border_color="rgba(255,255,255,0.08)")
+        card = ctk.CTkFrame(parent, fg_color="#1f2833", border_width=2, border_color="rgba(255,255,255,0.05)")
         card.grid(row=0, column=col, sticky="nsew", padx=10, pady=10)
 
         lbl = ctk.CTkLabel(card, text=title, font=("SF Pro Display", 16, "bold"), text_color="#00e5ff")
         lbl.pack(pady=10)
 
-        status = ctk.CTkLabel(card, text="Idle", text_color="#8b949e", wraplength=200)
+        status = ctk.CTkLabel(card, text="Waiting...", text_color="#8b949e", wraplength=200)
         status.pack(pady=10)
 
         return {"frame": card, "status": status}
 
+    def toggle_voice(self):
+        self.orchestrator.voice.set_enabled(self.voice_var.get())
+
     def handle_agent_event(self, event_type, data):
-        # Ensure all UI updates happen on the main thread
         self.after(0, lambda: self._handle_event_main_thread(event_type, data))
 
     def _handle_event_main_thread(self, event_type, data):
@@ -92,19 +99,23 @@ class OmniAgentGUI(ctk.CTk):
             x, y = data.get('x', 0), data.get('y', 0)
             self.overlay.show_target(x, y)
         elif event_type == "log":
-            self.log_box.insert("end", f"> {data}\n")
+            self.log_box.insert("end", f"⚡ {data}\n")
             self.log_box.see("end")
-        elif event_type == "memory_hit":
-            self.memory_list.insert("end", f"Pattern Found: {data}\n\n")
-        elif event_type == "skill_generated":
-            self.skill_list.insert("end", f"New Skill Evolved: {data}\n")
+        elif event_type == "agent_active":
+             # Dynamic Aura Glow logic
+             agent_name = data
+             for name, card in [("PM", self.pm_card), ("Executor", self.exec_card), ("Auditor", self.qa_card)]:
+                 if name == agent_name:
+                     card["frame"].configure(border_color="#00ffa3") # Active Green
+                 else:
+                     card["frame"].configure(border_color="rgba(255,255,255,0.05)")
 
     def start_task(self):
         goal = self.goal_entry.get()
         if goal:
             self.blackboard.goal = goal
             self.blackboard.is_running = True
-            self.log_box.insert("end", f"--- INITIATING SINGULARITY TASK: {goal} ---\n")
+            self.log_box.insert("end", f"✨ INITIATING PRO TASK: {goal}\n")
             threading.Thread(target=self.run_orchestrator_sync).start()
 
     def run_orchestrator_sync(self):
@@ -126,6 +137,6 @@ class OmniAgentGUI(ctk.CTk):
         self.resource_label.configure(text=f"CPU: {cpu}% | RAM: {ram:.1f}MB | Cost: ${self.blackboard.total_cost:.4f}")
 
         if self.blackboard.is_running:
-            self.pm_card["status"].configure(text=self.blackboard.status, text_color="#00ffa3")
+            self.pm_card["status"].configure(text=self.blackboard.status)
 
         self.after(1000, self.update_loop)

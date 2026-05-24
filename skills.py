@@ -109,6 +109,26 @@ class PluginGeneratorSkill(Skill):
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
+class AppleScriptSkill(Skill):
+    """Allows the agent to control macOS apps via AppleScript."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from applescript_utils import AppleScriptUtils
+        script = params.get("script")
+        if not script:
+            # Check for high-level templates
+            action = params.get("action")
+            if action == "safari_open":
+                script = AppleScriptUtils.safari_open_url(params.get("url"))
+            elif action == "mail_draft":
+                script = AppleScriptUtils.mail_send_email(params.get("to"), params.get("subject"), params.get("body"))
+            elif action == "notes_create":
+                script = AppleScriptUtils.notes_create_note(params.get("title"), params.get("body"))
+
+        if not script:
+            return {"status": "error", "error": "No script or action provided"}
+
+        return AppleScriptUtils.run_script(script)
+
 class SkillRegistry:
     def __init__(self):
         self._skills: Dict[str, Skill] = {
@@ -118,7 +138,8 @@ class SkillRegistry:
             "file": FileSystemSkill(),
             "execute_code": ExecuteCodeSkill(),
             "github": GithubSkill(),
-            "generate_skill": PluginGeneratorSkill()
+            "generate_skill": PluginGeneratorSkill(),
+            "applescript": AppleScriptSkill()
         }
     def register(self, name: str, skill: Skill):
         self._skills[name] = skill

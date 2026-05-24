@@ -10,6 +10,7 @@ from skills import SkillRegistry
 from plugin_system import PluginLoader
 from project_manager import ProjectManager
 from knowledge_manager import KnowledgeManager
+from rule_manager import RuleManager
 from web_server import run_server
 
 def main():
@@ -23,18 +24,16 @@ def main():
     vision = VisionClient()
     memory = MemoryVault()
     registry = SkillRegistry()
-
-    # Load Plugins
     loader = PluginLoader(registry)
     loader.load_plugins()
 
-    # Context Managers
     project = ProjectManager()
     knowledge = KnowledgeManager()
+    rules = RuleManager()
 
-    # Load active profile context
     profile_data = knowledge.get_profile(args.profile)
     knowledge_context = f"Knowledge Profile ({args.profile}): {profile_data}" if profile_data else ""
+    rules_context = rules.get_rules_context()
 
     orchestrator = Orchestrator(vision, registry, memory)
 
@@ -45,27 +44,17 @@ def main():
             return
 
         blackboard = Blackboard(args.goal)
-        # Start Web Server in background for CLI as well
         run_server(blackboard)
 
-        full_context = f"{knowledge_context}\n{project.get_workspace_summary()}"
+        full_context = f"{rules_context}\n{knowledge_context}\n{project.get_workspace_summary()}"
         asyncio.run(orchestrator.run(blackboard, full_context))
     else:
         from gui import OmniAgentGUI
         blackboard = Blackboard("")
-
-        # Start Web Server
         run_server(blackboard)
 
         app = OmniAgentGUI(orchestrator, blackboard)
-        # Pass context to orchestrator via closure or state
-        # For simplicity, we just pass the initial summary
-        initial_context = f"{knowledge_context}\n{project.get_workspace_summary()}"
-
-        # In GUI mode, the RUN button triggers orchestrator.run with initial_context
-        # We need to make sure gui knows about it
-        app.initial_context = initial_context
-
+        app.initial_context = f"{rules_context}\n{knowledge_context}\n{project.get_workspace_summary()}"
         app.mainloop()
 
 if __name__ == "__main__":
