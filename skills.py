@@ -386,6 +386,21 @@ class ToolAcquisitionSkill(Skill):
             return {"status": "success", "message": f"Tool '{tool}' acquired via {manager}."}
         except Exception as e: return {"status": "error", "error": str(e)}
 
+class SystemRepairSkill(Skill):
+    """OS Doctor: Autonomously manages macOS system settings and permissions."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        action = params.get("action")
+        import subprocess
+        try:
+            if action == "check_accessibility":
+                from mac_utils import is_trusted
+                return {"status": "success", "trusted": is_trusted()}
+            elif action == "flush_dns":
+                subprocess.run(['sudo', 'killall', '-HUP', 'mDNSResponder'], capture_output=True)
+                return {"status": "success", "message": "DNS Flushed."}
+            return {"status": "error", "error": f"Unknown OS action: {action}"}
+        except Exception as e: return {"status": "error", "error": str(e)}
+
 class SkillRegistry:
     def __init__(self):
         self._skills: Dict[str, Skill] = {
@@ -411,7 +426,8 @@ class SkillRegistry:
             "app_mapper": AppMapperSkill(),
             "gesture": GestureSkill(),
             "document_evolution": EvolutionSkill(),
-            "acquire_tool": ToolAcquisitionSkill()
+            "acquire_tool": ToolAcquisitionSkill(),
+            "system_repair": SystemRepairSkill()
         }
     def register(self, name: str, skill: Skill):
         self._skills[name] = skill

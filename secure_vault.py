@@ -1,12 +1,14 @@
 import os
 import base64
 import json
+from touch_id_gate import TouchIDGate
 
 class SecureVault:
-    """Local vault for API keys using base64 obfuscation (Production would use Keyring)."""
+    """Local vault with TouchID biometric gate."""
     def __init__(self, vault_path="knowledge/vault.enc"):
         self.vault_path = vault_path
         self.keys = self._load_vault()
+        self.gate = TouchIDGate()
 
     def _load_vault(self):
         if os.path.exists(self.vault_path):
@@ -22,8 +24,11 @@ class SecureVault:
         with open(self.vault_path, 'w') as f: f.write(encoded)
 
     def set_key(self, key_name: str, value: str):
-        self.keys[key_name] = value
-        self.save_vault()
+        if self.gate.authenticate(f"Store {key_name} in secure vault"):
+            self.keys[key_name] = value
+            self.save_vault()
 
     def get_key(self, key_name: str) -> str:
-        return self.keys.get(key_name)
+        if self.gate.authenticate(f"Retrieve {key_name} from secure vault"):
+            return self.keys.get(key_name)
+        return None
