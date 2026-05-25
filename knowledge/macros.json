@@ -1,0 +1,10 @@
+{
+  "test goal": [
+    {
+      "skill": "command",
+      "params": {
+        "cmd": "echo 'hello'"
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "macros": {
+    "test goal": [
+      {
+        "skill": "command",
+        "params": {
+          "cmd": "echo 'hello'"
+        }
+      }
+    ]
+  },
+  "preferences": {
+    "preferred_editor": "Cursor",
+    "ui_mode": "dark",
+    "coding_style": "pragmatic",
+    "apps": [
+      "iTerm2",
+      "Safari",
+      "Slack"
+    ]
+  }
+}
