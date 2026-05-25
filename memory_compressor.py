@@ -18,6 +18,6 @@ class MemoryCompressor:
         summary_raw = json.dumps(history[:5]) + "..." + json.dumps(history[-3:])
         prompt = f"Summarize this execution history into a 1-sentence strategic lesson: {summary_raw}"
 
-        summary = await self.vision._call_vision(prompt, None, "Strategy Synthesizer")
+        summary = await self.vision._call_text(prompt, "Strategy Synthesizer")
         logger.info("History compressed into lesson (%d chars)", len(summary))
         return summary

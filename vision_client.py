@@ -2,34 +2,49 @@ import os
 import base64
 import json
 import logging
-from openai import AsyncOpenAI
+from typing import Optional
+from llm_provider import LLMRouter
 
 logger = logging.getLogger(__name__)
 
 
 class VisionClient:
-    def __init__(self, api_key=None, model="gpt-4o-mini"):
-        self.client = AsyncOpenAI(api_key=api_key or os.environ.get("OPENAI_API_KEY"))
+    """Vision-Language client that routes through LLMRouter for offline/online resilience."""
+
+    def __init__(self, llm_router: LLMRouter = None, model: str = "gpt-4o-mini"):
+        self.llm = llm_router or LLMRouter()
         self.model = model
-        self.total_cost = 0.0
 
-    def _track_usage(self, r):
-        cost = (r.usage.prompt_tokens * 0.00000015) + (r.usage.completion_tokens * 0.00000060)
-        self.total_cost += cost
-        logger.debug("API call cost: $%.6f (total: $%.4f)", cost, self.total_cost)
+    @property
+    def total_cost(self) -> float:
+        return self.llm.total_cost
 
-    async def _call_vision(self, prompt, img_bytes, sys_prompt=None):
-        if not img_bytes:
-            return "{}"
-        m = [{"role": "system", "content": sys_prompt}] if sys_prompt else []
-        b64 = base64.b64encode(img_bytes).decode('utf-8')
-        m.append({"role": "user", "content": [
-            {"type": "text", "text": prompt},
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "low"}},
-        ]})
-        res = await self.client.chat.completions.create(model=self.model, messages=m, max_tokens=500)
-        self._track_usage(res)
-        return res.choices[0].message.content
+    @total_cost.setter
+    def total_cost(self, value: float):
+        self.llm.total_cost = value
+
+    async def _call_vision(self, prompt: str, img_bytes: Optional[bytes], sys_prompt: str = None) -> str:
+        messages = []
+        if sys_prompt:
+            messages.append({"role": "system", "content": sys_prompt})
+
+        if img_bytes:
+            b64 = base64.b64encode(img_bytes).decode("utf-8")
+            messages.append({"role": "user", "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "low"}},
+            ]})
+            return await self.llm.chat(messages, model=self.model, max_tokens=500, need_vision=True)
+        else:
+            messages.append({"role": "user", "content": [{"type": "text", "text": prompt}]})
+            return await self.llm.chat(messages, model=self.model, max_tokens=500, need_vision=False)
+
+    async def _call_text(self, prompt: str, sys_prompt: str = None, max_tokens: int = 500) -> str:
+        messages = []
+        if sys_prompt:
+            messages.append({"role": "system", "content": sys_prompt})
+        messages.append({"role": "user", "content": [{"type": "text", "text": prompt}]})
+        return await self.llm.chat(messages, model=self.model, max_tokens=max_tokens, need_vision=False)
 
     async def get_plan(self, goal, screenshot, ui_tree_summary, context=""):
         p = f"Goal: {goal}\nContext: {context}\nTree: {ui_tree_summary}\nGenerate JSON steps."
