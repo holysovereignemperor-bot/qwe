@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+exports/
+logs/
+knowledge/vault.key
+knowledge/vault.enc
+*.db

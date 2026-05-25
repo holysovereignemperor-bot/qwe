@@ -13,5 +13,9 @@ fastapi
 uvicorn
 numpy
 pytest
+pytest-asyncio
 python-dotenv
 importlib-metadata
+cryptography
+scikit-learn
+requests

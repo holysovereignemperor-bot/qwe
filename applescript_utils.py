@@ -1,14 +1,29 @@
 import subprocess
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class AppleScriptUtils:
-    """Enhanced Templates for macOS Office Automation."""
+    """Templates for macOS automation via AppleScript."""
 
     @staticmethod
     def run_script(script: str):
         try:
             result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True, timeout=10)
-            return {"status": "success" if result.returncode == 0 else "error", "stdout": result.stdout, "stderr": result.stderr}
-        except Exception as e: return {"status": "error", "error": str(e)}
+            if result.returncode != 0:
+                logger.warning("AppleScript error: %s", result.stderr.strip())
+            return {
+                "status": "success" if result.returncode == 0 else "error",
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+            }
+        except subprocess.TimeoutExpired:
+            logger.error("AppleScript timed out")
+            return {"status": "error", "error": "Script timed out"}
+        except Exception as e:
+            logger.error("AppleScript failed: %s", e)
+            return {"status": "error", "error": str(e)}
 
     @staticmethod
     def safari_open_url(url: str):
@@ -20,7 +35,6 @@ class AppleScriptUtils:
 
     @staticmethod
     def calendar_create_event(title: str, start_date: str):
-        # start_date format: "MM/DD/YYYY HH:MM:SS"
         return f'tell application "Calendar" to tell calendar "Work" to make new event with properties {{summary:"{title}", start date:date "{start_date}"}}'
 
     @staticmethod
