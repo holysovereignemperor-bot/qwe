@@ -338,6 +338,28 @@ class AppMapperSkill(Skill):
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
+class GestureSkill(Skill):
+    """Gesture Mastery: Simulates multi-touch swipes, scrolls, and drags."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from mac_utils import simulate_gesture
+        action = params.get("action")
+        try:
+            simulate_gesture(action, x=params.get("x"), y=params.get("y"), dx=params.get("dx", 0), dy=params.get("dy", 0))
+            return {"status": "success", "message": f"Gesture '{action}' performed."}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+class EvolutionSkill(Skill):
+    """Self-Documenting Evolution: Maintains a history of structural improvements."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        log_entry = params.get("entry")
+        if not log_entry: return {"status": "error", "error": "No entry"}
+        path = "AGENT_EVOLUTION.md"
+        try:
+            with open(path, "a") as f: f.write(f"\n- {time.strftime('%Y-%m-%d %H:%M:%S')}: {log_entry}")
+            return {"status": "success", "message": "Evolution documented."}
+        except Exception as e: return {"status": "error", "error": str(e)}
+
 class SkillRegistry:
     def __init__(self):
         self._skills: Dict[str, Skill] = {
@@ -360,7 +382,9 @@ class SkillRegistry:
             "generate_doc": DocumentationSkill(),
             "project_architect": ProjectArchitectSkill(),
             "cli_factory": CLIFactorySkill(),
-            "app_mapper": AppMapperSkill()
+            "app_mapper": AppMapperSkill(),
+            "gesture": GestureSkill(),
+            "document_evolution": EvolutionSkill()
         }
     def register(self, name: str, skill: Skill):
         self._skills[name] = skill

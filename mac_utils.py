@@ -183,3 +183,15 @@ def simulate_click(x, y):
     import pyautogui; pyautogui.click(x, y)
 def simulate_type(text):
     import pyautogui; pyautogui.write(text, interval=0.05)
+
+def simulate_gesture(action, x=None, y=None, dx=0, dy=0):
+    """Simulates macOS gestures and scrolls."""
+    import pyautogui
+    if action == "scroll":
+        pyautogui.scroll(dy)
+    elif action == "drag":
+        pyautogui.dragTo(x, y, duration=0.5)
+    elif action == "swipe_left":
+        pyautogui.hotkey('ctrl', 'left')
+    elif action == "swipe_right":
+        pyautogui.hotkey('ctrl', 'right')

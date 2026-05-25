@@ -34,17 +34,13 @@ class Orchestrator:
 
     async def run(self, blackboard: Blackboard, project_context: str = ""):
         blackboard.gui_callback = self.status_callback
-        self.doctor.optimize_performance()
-
         try:
             while blackboard.is_running and blackboard.current_step_index < self.MAX_STEPS:
-                while blackboard.is_paused:
-                    # Proactive maintenance while paused/idle
-                    self.doctor.proactive_maintenance()
-                    await asyncio.sleep(2.0)
-                    if not blackboard.is_running: return
-
+                while blackboard.is_paused: await asyncio.sleep(0.5)
                 gc.collect()
+                # Auto-Persistence after each step
+                blackboard.save_state()
+
                 blackboard.total_cost = self.architect.vision.total_cost
                 pre_screenshot, marks = get_marked_screenshot()
                 blackboard.last_screenshot = pre_screenshot
@@ -63,6 +59,8 @@ class Orchestrator:
 
                 if self.status_callback: self.status_callback("agent_active", "Auditor")
                 post_screenshot, _ = get_marked_screenshot()
+                diff_score = compute_visual_diff(pre_screenshot, post_screenshot)
+                blackboard.last_screenshot = post_screenshot
                 verification = await self.auditor.verify(action, blackboard)
                 blackboard.add_history(action, verification)
 

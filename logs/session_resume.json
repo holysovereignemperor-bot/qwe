@@ -1,0 +1,13 @@
+{
+  "goal": "test goal",
+  "plan": [
+    {
+      "action": "test",
+      "description": "test step"
+    }
+  ],
+  "history": [],
+  "step": 0,
+  "bus": {},
+  "cost": 0.0
+}
