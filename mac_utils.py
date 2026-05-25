@@ -14,6 +14,9 @@ try:
 except ImportError:
     Cocoa = Quartz = ApplicationServices = NSScreen = NSWorkspace = NSPanel = NSColor = NSView = NSBezierPath = NSTextField = None
 
+# Global state for Temporal consistency
+_UI_ELEMENT_CACHE = {}
+
 def get_window_metadata():
     if not NSWorkspace: return {}
     workspace = NSWorkspace.sharedWorkspace()
@@ -60,10 +63,13 @@ def capture_screen_raw(display_id=None):
     return img.convert("RGB")
 
 def get_marked_screenshot(quality=50, max_width=1024, attention_regions=None):
+    """Temporal UI Consistency: Elements retain IDs across frames."""
+    global _UI_ELEMENT_CACHE
     img = capture_screen_raw()
     if not img: return None, []
     ui_tree = get_ui_tree()
     if "error" in ui_tree: return capture_screen(quality, max_width), []
+
     elements = []
     def collect_elements(node):
         if "rect" in node and isinstance(node["rect"], dict):
@@ -71,18 +77,34 @@ def get_marked_screenshot(quality=50, max_width=1024, attention_regions=None):
         if "children" in node:
             for child in node["children"]: collect_elements(child)
     collect_elements(ui_tree)
+
     draw = ImageDraw.Draw(img, "RGBA")
     try: font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 20)
     except: font = ImageFont.load_default()
+
+    new_cache = {}
     marks = []
     for i, el in enumerate(elements[:100]):
         rect = el["rect"]; x, y, w, h = rect["x"], rect["y"], rect["w"], rect["h"]
+
+        # Stability check: match element to previous cache by title/role
+        el_id = f"{el.get('role')}_{el.get('title')}"
+        if el_id in _UI_ELEMENT_CACHE:
+             display_id = _UI_ELEMENT_CACHE[el_id]
+        else:
+             display_id = i
+        new_cache[el_id] = display_id
+
         if el.get("role") == "AXSecureTextField" or "password" in el.get("description", "").lower():
             draw.rectangle([x, y, x + w, y + h], fill="black"); continue
+
         draw.rectangle([x, y, x + w, y + h], outline=(0, 229, 255, 180), width=2)
         draw.rectangle([x, y, x + 25, y + 25], fill=(0, 229, 255, 255))
-        draw.text((x + 5, y + 2), str(i), fill="black", font=font)
-        marks.append({"id": i, "role": el.get("role"), "title": el.get("title"), "rect": rect})
+        draw.text((x + 5, y + 2), str(display_id), fill="black", font=font)
+        marks.append({"id": display_id, "role": el.get("role"), "title": el.get("title"), "rect": rect})
+
+    _UI_ELEMENT_CACHE = new_cache
+
     img = img.convert("L").convert("RGB")
     native_w, native_h = img.size
     if native_w > max_width:
@@ -131,7 +153,6 @@ class GenesisHUD:
         threading.Thread(target=_create).start()
 
     def show_monologue(self, text, duration=4.0):
-        """Thought Overlay: Native floating monologue."""
         if not NSPanel or not NSTextField: return
         import threading
         def _create():
@@ -165,3 +186,9 @@ def simulate_click(x, y):
     import pyautogui; pyautogui.click(x, y)
 def simulate_type(text):
     import pyautogui; pyautogui.write(text, interval=0.05)
+def simulate_gesture(action, x=None, y=None, dx=0, dy=0):
+    import pyautogui
+    if action == "scroll": pyautogui.scroll(dy)
+    elif action == "drag": pyautogui.dragTo(x, y, duration=0.5)
+    elif action == "swipe_left": pyautogui.hotkey('ctrl', 'left')
+    elif action == "swipe_right": pyautogui.hotkey('ctrl', 'right')
