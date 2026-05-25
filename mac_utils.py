@@ -55,18 +55,15 @@ def capture_screen_raw(display_id=None):
     image_ref = Quartz.CGDisplayCreateImage(display_id)
     if not image_ref: return None
     width, height = Quartz.CGImageGetWidth(image_ref), Quartz.CGImageGetHeight(image_ref)
-    provider = Quartz.CGImageGetDataProvider(image_ref)
-    data = Quartz.CGDataProviderCopyData(provider)
+    provider = Quartz.CGImageGetDataProvider(image_ref); data = Quartz.CGDataProviderCopyData(provider)
     img = Image.frombuffer("RGBA", (width, height), data, "raw", "RGBA", 0, 1)
     return img.convert("RGB")
 
 def get_marked_screenshot(quality=50, max_width=1024, attention_regions=None):
-    """Semantic Attention Mapping: Highlights areas the model is focused on."""
     img = capture_screen_raw()
     if not img: return None, []
     ui_tree = get_ui_tree()
     if "error" in ui_tree: return capture_screen(quality, max_width), []
-
     elements = []
     def collect_elements(node):
         if "rect" in node and isinstance(node["rect"], dict):
@@ -74,18 +71,9 @@ def get_marked_screenshot(quality=50, max_width=1024, attention_regions=None):
         if "children" in node:
             for child in node["children"]: collect_elements(child)
     collect_elements(ui_tree)
-
     draw = ImageDraw.Draw(img, "RGBA")
     try: font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 20)
     except: font = ImageFont.load_default()
-
-    # Draw Attention Heatmap if provided
-    if attention_regions:
-        for reg in attention_regions:
-            # reg: {"x", "y", "w", "h", "weight"}
-            rx, ry, rw, rh = reg["x"], reg["y"], reg["w"], reg["h"]
-            draw.rectangle([rx, ry, rx+rw, ry+rh], fill=(255, 0, 0, 40)) # Red tint
-
     marks = []
     for i, el in enumerate(elements[:100]):
         rect = el["rect"]; x, y, w, h = rect["x"], rect["y"], rect["w"], rect["h"]
@@ -95,14 +83,12 @@ def get_marked_screenshot(quality=50, max_width=1024, attention_regions=None):
         draw.rectangle([x, y, x + 25, y + 25], fill=(0, 229, 255, 255))
         draw.text((x + 5, y + 2), str(i), fill="black", font=font)
         marks.append({"id": i, "role": el.get("role"), "title": el.get("title"), "rect": rect})
-
     img = img.convert("L").convert("RGB")
     native_w, native_h = img.size
     if native_w > max_width:
         ratio = max_width / float(native_w); new_height = int(float(native_h) * ratio)
         img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
-    buffer = BytesIO(); img.save(buffer, format="JPEG", quality=quality)
-    gc.collect()
+    buffer = BytesIO(); img.save(buffer, format="JPEG", quality=quality); gc.collect()
     return buffer.getvalue(), marks
 
 def compute_visual_diff(img_bytes1, img_bytes2):
@@ -131,67 +117,51 @@ if NSView:
 else: HUDView = object
 
 class GenesisHUD:
-    def __init__(self): self.panel = None
+    def __init__(self): self.panel = None; self.thought_panel = None
     def show_target(self, x, y, duration=1.0):
         if not NSPanel or not NSView: return
         import threading
-        def _create_panel():
+        def _create():
             screen_h = NSScreen.mainScreen().frame().size.height
-            flipped_y = screen_h - y - 25
-            frame = NSRect(NSPoint(x - 25, flipped_y), NSSize(50, 50))
-            self.panel = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(frame, 0, 2, False)
-            self.panel.setFloatingPanel_(True); self.panel.setLevel_(NSWindowAbove)
-            self.panel.setHasShadow_(False); self.panel.setOpaque_(False); self.panel.setBackgroundColor_(NSColor.clearColor())
-            view = HUDView.alloc().initWithFrame_(self.panel.contentView().bounds())
-            self.panel.setContentView_(view); self.panel.makeKeyAndOrderFront_(None); self.panel.display()
-            time.sleep(duration); self.panel.close()
-        threading.Thread(target=_create_panel).start()
+            frame = NSRect(NSPoint(x - 25, screen_h - y - 25), NSSize(50, 50))
+            p = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(frame, 0, 2, False)
+            p.setFloatingPanel_(True); p.setLevel_(NSWindowAbove); p.setBackgroundColor_(NSColor.clearColor())
+            p.setContentView_(HUDView.alloc().initWithFrame_(p.contentView().bounds()))
+            p.makeKeyAndOrderFront_(None); time.sleep(duration); p.close()
+        threading.Thread(target=_create).start()
 
-    def spawn_status_hud(self, text, x=100, y=100, duration=3.0):
+    def show_monologue(self, text, duration=4.0):
+        """Thought Overlay: Native floating monologue."""
         if not NSPanel or not NSTextField: return
         import threading
-        def _create_status():
-            frame = NSRect(NSPoint(x, y), NSSize(300, 40))
-            panel = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(frame, 0, 2, False)
-            panel.setFloatingPanel_(True); panel.setLevel_(NSWindowAbove)
-            panel.setBackgroundColor_(NSColor.blackColor().colorWithAlphaComponent_(0.8))
-            label = NSTextField.alloc().initWithFrame_(panel.contentView().bounds())
+        def _create():
+            screen_w = NSScreen.mainScreen().frame().size.width
+            frame = NSRect(NSPoint(screen_w / 2 - 200, 50), NSSize(400, 40))
+            p = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(frame, 0, 2, False)
+            p.setFloatingPanel_(True); p.setLevel_(NSWindowAbove)
+            p.setBackgroundColor_(NSColor.blackColor().colorWithAlphaComponent_(0.8))
+            label = NSTextField.alloc().initWithFrame_(p.contentView().bounds())
             label.setStringValue_(text); label.setTextColor_(NSColor.cyanColor())
-            label.setBezeled_(False); label.setDrawsBackground_(False); label.setEditable_(False)
-            label.setAlignment_(NSTextAlignmentCenter)
-            panel.setContentView_(label); panel.makeKeyAndOrderFront_(None); panel.display()
-            time.sleep(duration); panel.close()
-        threading.Thread(target=_create_status).start()
+            label.setBezeled_(False); label.setDrawsBackground_(False); label.setEditable_(False); label.setAlignment_(NSTextAlignmentCenter)
+            p.setContentView_(label); p.makeKeyAndOrderFront_(None); p.display()
+            time.sleep(duration); p.close()
+        threading.Thread(target=_create).start()
 
 class GhostOverlay:
     def __init__(self, master=None): self.master = master; self.hud = GenesisHUD()
     def show_target(self, x, y, duration=1000):
         if NSPanel and NSView != object: self.hud.show_target(x, y, duration/1000.0)
     def show_status(self, text):
-        if NSPanel: self.hud.spawn_status_hud(text)
+        if NSPanel: self.hud.show_monologue(text)
 
 def get_screen_dimensions():
     if not NSScreen: return 1920, 1080
-    f = NSScreen.mainScreen().frame()
-    return f.size.width, f.size.height
+    f = NSScreen.mainScreen().frame(); return f.size.width, f.size.height
 
 def scale_coordinate(x, y, from_width, from_height):
-    sw, sh = get_screen_dimensions()
-    return x * (sw / from_width), y * (sh / from_height)
+    sw, sh = get_screen_dimensions(); return x * (sw / from_width), y * (sh / from_height)
 
 def simulate_click(x, y):
     import pyautogui; pyautogui.click(x, y)
 def simulate_type(text):
     import pyautogui; pyautogui.write(text, interval=0.05)
-
-def simulate_gesture(action, x=None, y=None, dx=0, dy=0):
-    """Simulates macOS gestures and scrolls."""
-    import pyautogui
-    if action == "scroll":
-        pyautogui.scroll(dy)
-    elif action == "drag":
-        pyautogui.dragTo(x, y, duration=0.5)
-    elif action == "swipe_left":
-        pyautogui.hotkey('ctrl', 'left')
-    elif action == "swipe_right":
-        pyautogui.hotkey('ctrl', 'right')

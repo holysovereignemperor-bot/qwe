@@ -27,6 +27,7 @@ async def test_full_orchestration_loop(mock_vision):
     blackboard = Blackboard("test goal")
     blackboard.plan = [{"action": "test", "description": "test step"}]
 
+    # Updated BehaviorManager uses 'get_workflow' instead of 'get_macro'
     with patch('orchestrator.get_marked_screenshot', return_value=(b"fake_image", [])), \
          patch('orchestrator.get_ui_tree', return_value={"role": "root"}), \
          patch('orchestrator.get_window_metadata', return_value={"app": "test"}), \
@@ -34,7 +35,7 @@ async def test_full_orchestration_loop(mock_vision):
          patch('orchestrator.open', MagicMock()), \
          patch('orchestrator.VoiceOS.speak', MagicMock()), \
          patch('orchestrator.gc.collect', MagicMock()), \
-         patch('orchestrator.BehaviorManager.get_macro', return_value=None): # Ensure we don't skip to completed
+         patch('orchestrator.BehaviorManager.get_workflow', return_value=None):
 
         task = asyncio.create_task(orchestrator.run(blackboard))
         await asyncio.sleep(1.2)

@@ -12,12 +12,12 @@ class VisionClient:
     def _track_usage(self, r):
         self.total_cost += (r.usage.prompt_tokens * 0.00000015) + (r.usage.completion_tokens * 0.00000060)
 
-    async def _call_vision(self, prompt, img_bytes, sys_prompt=None):
+    async def _call_vision(self, prompt, img_bytes, sys_prompt=None, temp=0.0):
         if not img_bytes: return "{}"
         m = [{"role": "system", "content": sys_prompt}] if sys_prompt else []
         b64 = base64.b64encode(img_bytes).decode('utf-8')
         m.append({"role": "user", "content": [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "low"}}]})
-        res = await self.client.chat.completions.create(model=self.model, messages=m, max_tokens=500)
+        res = await self.client.chat.completions.create(model=self.model, messages=m, max_tokens=500, temperature=temp)
         self._track_usage(res)
         return res.choices[0].message.content
 
@@ -31,16 +31,7 @@ class VisionClient:
         except: return [{"action": "error", "description": res}]
 
     async def get_action(self, step, screenshot, ui_tree_summary):
-        # Semantic UI Grounding: Instruct model to use labels OR semantic anchors
-        p = f"""
-Step: {json.dumps(step)}
-Tree Summary: {ui_tree_summary}
-
-Instructions:
-1. Prefer using the 'Visual Marks' IDs (0, 1, 2...) for coordinates.
-2. If ID is missing, identify the element by its 'Semantic Anchor' (e.g., 'blue button', 'search field').
-Return JSON with 'skill', 'params' (x, y relative to 1024 width), and 'reasoning'.
-"""
+        p = f"Step: {json.dumps(step)}\nTree: {ui_tree_summary}\nReturn JSON skill/params/reasoning."
         res = await self._call_vision(p, screenshot, "Executor")
         try:
             if "```json" in res: json_str = res.split("```json")[1].split("```")[0].strip()
@@ -48,11 +39,18 @@ Return JSON with 'skill', 'params' (x, y relative to 1024 width), and 'reasoning
             return json.loads(json_str)
         except: return {"skill": "error", "error": res}
 
-    async def verify_outcome(self, last_action, screenshot, ui_tree_summary):
-        p = f"Action: {json.dumps(last_action)}\nTree: {ui_tree_summary}\nVerify success. Return JSON 'success', 'observation'."
-        res = await self._call_vision(p, screenshot, "Auditor")
-        try:
-            if "```json" in res: json_str = res.split("```json")[1].split("```")[0].strip()
-            else: json_str = res.strip()
-            return json.loads(json_str)
-        except: return {"success": False, "observation": res}
+    async def verify_outcome(self, last_action, screenshot, ui_tree_summary, high_stakes=False):
+        """Consensus Verification: High-stakes actions trigger dual verification paths."""
+        async def _single_verify(t):
+             res = await self._call_vision(f"Verify: {json.dumps(last_action)}", screenshot, "Auditor", temp=t)
+             try:
+                 if "```json" in res: return json.loads(res.split("```json")[1].split("```")[0].strip())
+                 return json.loads(res)
+             except: return {"success": False}
+
+        v1 = await _single_verify(0.0)
+        if not high_stakes: return v1
+
+        # Dual Path Consensus
+        v2 = await _single_verify(0.7)
+        return v1 if v1.get("success") == v2.get("success") else {"success": False, "observation": "Consensus failed."}
