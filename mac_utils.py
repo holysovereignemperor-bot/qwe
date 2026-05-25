@@ -60,11 +60,13 @@ def capture_screen_raw(display_id=None):
     img = Image.frombuffer("RGBA", (width, height), data, "raw", "RGBA", 0, 1)
     return img.convert("RGB")
 
-def get_marked_screenshot(quality=50, max_width=1024):
+def get_marked_screenshot(quality=50, max_width=1024, attention_regions=None):
+    """Semantic Attention Mapping: Highlights areas the model is focused on."""
     img = capture_screen_raw()
     if not img: return None, []
     ui_tree = get_ui_tree()
     if "error" in ui_tree: return capture_screen(quality, max_width), []
+
     elements = []
     def collect_elements(node):
         if "rect" in node and isinstance(node["rect"], dict):
@@ -72,21 +74,25 @@ def get_marked_screenshot(quality=50, max_width=1024):
         if "children" in node:
             for child in node["children"]: collect_elements(child)
     collect_elements(ui_tree)
-    draw = ImageDraw.Draw(img)
+
+    draw = ImageDraw.Draw(img, "RGBA")
     try: font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 20)
     except: font = ImageFont.load_default()
+
+    # Draw Attention Heatmap if provided
+    if attention_regions:
+        for reg in attention_regions:
+            # reg: {"x", "y", "w", "h", "weight"}
+            rx, ry, rw, rh = reg["x"], reg["y"], reg["w"], reg["h"]
+            draw.rectangle([rx, ry, rx+rw, ry+rh], fill=(255, 0, 0, 40)) # Red tint
 
     marks = []
     for i, el in enumerate(elements[:100]):
         rect = el["rect"]; x, y, w, h = rect["x"], rect["y"], rect["w"], rect["h"]
-
-        # Privacy Shield: Redact Password fields or sensitive roles
         if el.get("role") == "AXSecureTextField" or "password" in el.get("description", "").lower():
-            draw.rectangle([x, y, x + w, y + h], fill="black")
-            continue
-
-        draw.rectangle([x, y, x + w, y + h], outline="cyan", width=2)
-        draw.rectangle([x, y, x + 25, y + 25], fill="cyan")
+            draw.rectangle([x, y, x + w, y + h], fill="black"); continue
+        draw.rectangle([x, y, x + w, y + h], outline=(0, 229, 255, 180), width=2)
+        draw.rectangle([x, y, x + 25, y + 25], fill=(0, 229, 255, 255))
         draw.text((x + 5, y + 2), str(i), fill="black", font=font)
         marks.append({"id": i, "role": el.get("role"), "title": el.get("title"), "rect": rect})
 

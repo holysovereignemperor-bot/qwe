@@ -1,14 +1,10 @@
 import sqlite3
 import json
-import logging
+import os
 from typing import List, Dict, Any
-
-logger = logging.getLogger(__name__)
-
 
 class LessonVault:
     """Stores generalized task patterns synthesized from successful experiences."""
-
     def __init__(self, db_path="knowledge/lessons.db"):
         self.db_path = db_path
         self._init_db()
@@ -28,36 +24,27 @@ class LessonVault:
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_topic ON lessons(topic)")
             conn.commit()
-            logger.info("LessonVault initialized: %s", self.db_path)
-        except sqlite3.Error as e:
-            logger.error("LessonVault DB init failed: %s", e)
-            raise
         finally:
             conn.close()
 
     def add_lesson(self, topic: str, strategy: str):
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.execute("SELECT id, usage_count FROM lessons WHERE topic = ?", (topic,))
-                row = cursor.fetchone()
-                if row:
-                    conn.execute(
-                        "UPDATE lessons SET usage_count = ? WHERE id = ?",
-                        (row[1] + 1, row[0])
-                    )
-                else:
-                    conn.execute(
-                        "INSERT INTO lessons (topic, strategy, success_rate) VALUES (?, ?, ?)",
-                        (topic, strategy, 1.0)
-                    )
-            logger.info("Lesson added for topic: %s", topic[:50])
-        except sqlite3.Error as e:
-            logger.error("Failed to add lesson: %s", e)
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("SELECT id, usage_count FROM lessons WHERE topic = ?", (topic,))
+            row = cursor.fetchone()
+            if row:
+                conn.execute(
+                    "UPDATE lessons SET usage_count = ? WHERE id = ?",
+                    (row[1] + 1, row[0])
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO lessons (topic, strategy, success_rate) VALUES (?, ?, ?)",
+                    (topic, strategy, 1.0)
+                )
 
     def get_lessons(self, goal: str, limit=3) -> List[Dict[str, Any]]:
         words = goal.lower().split()
-        if not words:
-            return []
+        if not words: return []
         conditions = " OR ".join(["topic LIKE ?" for _ in words])
         query = f"SELECT topic, strategy FROM lessons WHERE {conditions} ORDER BY usage_count DESC LIMIT ?"
         params = [f"%{w}%" for w in words] + [limit]
@@ -68,6 +55,5 @@ class LessonVault:
                 cursor = conn.execute(query, params)
                 for row in cursor:
                     results.append({"topic": row[0], "strategy": row[1]})
-        except sqlite3.OperationalError as e:
-            logger.error("Lesson retrieval failed: %s", e)
+        except sqlite3.OperationalError: pass
         return results

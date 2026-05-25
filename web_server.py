@@ -1,29 +1,21 @@
-import logging
+import os
+import asyncio
 import threading
-from html import escape
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from blackboard import Blackboard
-
-logger = logging.getLogger(__name__)
 
 app = FastAPI()
 _current_blackboard = None
 
-
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
     global _current_blackboard
-    if not _current_blackboard:
-        return "<h1>OmniAgent: Idle</h1>"
+    if not _current_blackboard: return "<h1>OmniAgent: Idle</h1>"
 
     data = _current_blackboard.to_dict()
-    monologue_entries = _current_blackboard.chat_history[-10:]
-    monologue = "\n".join([f"> {escape(c['content'])}" for c in monologue_entries])
-
-    goal = escape(str(data.get("goal", "")))
-    status = escape(str(data.get("status", "")))
-    cost = float(data.get("total_cost", 0))
+    # Monologue feed
+    monologue = "\n".join([f"> {c['content']}" for c in _current_blackboard.chat_history[-10:]])
 
     html = f"""
     <html>
@@ -40,9 +32,9 @@ async def dashboard():
         <body>
             <h1>OmniAgent OS: Elite Monolith</h1>
             <div class="card">
-                <p>Goal: {goal}</p>
-                <p>Status: {status}</p>
-                <p>Cost: ${cost:.4f}</p>
+                <p>Goal: {data['goal']}</p>
+                <p>Status: {data['status']}</p>
+                <p>Cost: ${data['total_cost']:.4f}</p>
             </div>
             <h2>Internal Monologue</h2>
             <div class="terminal"><pre>{monologue}</pre></div>
@@ -52,15 +44,11 @@ async def dashboard():
     """
     return html
 
-
 @app.post("/kill")
 async def kill_switch():
     global _current_blackboard
-    if _current_blackboard:
-        _current_blackboard.is_running = False
-        logger.info("Kill switch activated")
+    if _current_blackboard: _current_blackboard.is_running = False
     return {"status": "Stopped"}
-
 
 def run_server(blackboard: Blackboard, port=8080):
     global _current_blackboard
@@ -69,5 +57,4 @@ def run_server(blackboard: Blackboard, port=8080):
     config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="error")
     server = uvicorn.Server(config)
     threading.Thread(target=server.run, daemon=True).start()
-    logger.info("Web dashboard started on port %d", port)
     return server

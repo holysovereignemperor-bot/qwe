@@ -1,10 +1,6 @@
 import time
 import json
-import logging
 from typing import List, Dict, Any, Optional
-
-logger = logging.getLogger(__name__)
-
 
 class Blackboard:
     """State for agents with Omni-Bus and Recursive Verification."""

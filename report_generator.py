@@ -1,15 +1,10 @@
 import os
 import json
 import time
-import logging
 from blackboard import Blackboard
 
-logger = logging.getLogger(__name__)
-
-
 class ReportGenerator:
-    """Generates automated markdown summaries and audit logs."""
-
+    """Generates automated markdown summaries and financial audit logs."""
     def __init__(self, export_dir="exports"):
         self.export_dir = export_dir
         if not os.path.exists(self.export_dir):
@@ -42,11 +37,9 @@ class ReportGenerator:
         try:
             with open(path, 'w') as f:
                 f.write(report)
-            logger.info("Report saved to %s", path)
-        except Exception as e:
-            logger.error("Failed to save report: %s", e)
+        except Exception:
+            pass
         return path
-
 
 def time_format(seconds):
     m, s = divmod(int(seconds), 60)
