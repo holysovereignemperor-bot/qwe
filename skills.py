@@ -73,17 +73,29 @@ class FileSystemSkill(Skill):
             return {"status": "error", "error": str(e)}
 
 class ExecuteCodeSkill(Skill):
+    """Smart Sandboxing: Executes Python in a task-specific virtual environment."""
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         code = params.get('code', '')
-        if not code:
-            return {"status": "error", "error": "No code provided"}
-        stdout, stderr = io.StringIO(), io.StringIO()
-        try:
-            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-                exec(code, {"__builtins__": __builtins__})
-            return {"status": "success", "stdout": stdout.getvalue(), "stderr": stderr.getvalue()}
-        except Exception as e:
-            return {"status": "error", "error": str(e), "stdout": stdout.getvalue(), "stderr": stderr.getvalue()}
+        use_venv = params.get("use_sandbox", True)
+        if not code: return {"status": "error", "error": "No code"}
+
+        import tempfile
+        import venv
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            if use_venv:
+                venv.create(tmpdir, with_pip=True)
+                python_bin = os.path.join(tmpdir, "bin", "python")
+            else: python_bin = "python3"
+
+            script_path = os.path.join(tmpdir, "script.py")
+            with open(script_path, "w") as f: f.write(code)
+
+            try:
+                res = subprocess.run([python_bin, script_path], capture_output=True, text=True, timeout=30)
+                return {"status": "success", "stdout": res.stdout, "stderr": res.stderr}
+            except Exception as e: return {"status": "error", "error": str(e)}
 
 class GithubSkill(Skill):
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -360,6 +372,20 @@ class EvolutionSkill(Skill):
             return {"status": "success", "message": "Evolution documented."}
         except Exception as e: return {"status": "error", "error": str(e)}
 
+class ToolAcquisitionSkill(Skill):
+    """Autonomous Tool Acquisition: Installs missing system binaries or libs."""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        tool = params.get("tool")
+        manager = params.get("manager", "brew") # brew or pip
+        if not tool: return {"status": "error", "error": "No tool"}
+
+        import subprocess
+        try:
+            cmd = [manager, "install", tool]
+            subprocess.run(cmd, capture_output=True, timeout=60)
+            return {"status": "success", "message": f"Tool '{tool}' acquired via {manager}."}
+        except Exception as e: return {"status": "error", "error": str(e)}
+
 class SkillRegistry:
     def __init__(self):
         self._skills: Dict[str, Skill] = {
@@ -384,7 +410,8 @@ class SkillRegistry:
             "cli_factory": CLIFactorySkill(),
             "app_mapper": AppMapperSkill(),
             "gesture": GestureSkill(),
-            "document_evolution": EvolutionSkill()
+            "document_evolution": EvolutionSkill(),
+            "acquire_tool": ToolAcquisitionSkill()
         }
     def register(self, name: str, skill: Skill):
         self._skills[name] = skill

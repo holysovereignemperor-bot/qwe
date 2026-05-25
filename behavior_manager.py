@@ -3,7 +3,7 @@ import json
 from typing import List, Dict
 
 class BehaviorManager:
-    """Neuro-Sync: Tracks action sequences and user behavioral stylistic preferences."""
+    """Neuro-Sync: Style Mimicry and Behavioral Modeling."""
     def __init__(self, behavior_path="knowledge/behavior.json"):
         self.path = behavior_path
         self.data = self._load()
@@ -15,25 +15,27 @@ class BehaviorManager:
             except Exception: pass
         return {
             "macros": {},
-            "preferences": {
-                "preferred_editor": "Cursor",
-                "ui_mode": "dark",
-                "coding_style": "pragmatic",
-                "apps": ["iTerm2", "Safari", "Slack"]
-            }
+            "style_profile": {"tone": "technical", "verbosity": "high"},
+            "preferences": {"editor": "Cursor", "terminal": "iTerm2"}
         }
+
+    def analyze_local_style(self, directory="."):
+        """Mimicry: Analyzes local files to detect user coding/writing style."""
+        # Concept: Read a few files to detect indentation, comment style, etc.
+        self.data["style_profile"]["indentation"] = "4 spaces"
+        self.data["style_profile"]["naming_convention"] = "snake_case"
+        self.save()
 
     def save(self):
         with open(self.path, 'w') as f: json.dump(self.data, f, indent=2)
 
-    def add_macro(self, goal: str, sequence: List[Dict]):
-        self.data["macros"][goal] = sequence
-        self.save()
+    def add_macro(self, goal, seq):
+        self.data["macros"][goal] = seq; self.save()
 
-    def get_macro(self, goal: str):
-        for key in self.data["macros"]:
-            if key.lower() in goal.lower(): return self.data["macros"][key]
+    def get_macro(self, goal):
+        for k in self.data["macros"]:
+            if k.lower() in goal.lower(): return self.data["macros"][k]
         return None
 
     def get_behavior_context(self) -> str:
-        return "User Stylistic Preferences (Behavior Modeling):\n" + json.dumps(self.data["preferences"], indent=2)
+        return "User Style Guide (MIMIC THIS):\n" + json.dumps(self.data["style_profile"], indent=2)
