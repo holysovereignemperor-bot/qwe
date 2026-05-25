@@ -19,3 +19,4 @@ importlib-metadata
 cryptography
 scikit-learn
 requests
+aiohttp

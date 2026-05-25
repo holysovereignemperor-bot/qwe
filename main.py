@@ -2,7 +2,8 @@ import asyncio
 import sys
 import argparse
 import logging
-import threading
+import os
+from llm_provider import LLMRouter, OpenAIProvider, OllamaProvider, ResponseCache
 from vision_client import VisionClient
 from blackboard import Blackboard
 from orchestrator import Orchestrator
@@ -19,6 +20,8 @@ from lesson_vault import LessonVault
 from behavior_manager import BehaviorManager
 from system_watchdog import SystemWatchdog
 from system_doctor import SystemDoctor
+from checkpoint_manager import CheckpointManager
+from task_decomposer import TaskDecomposer
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +38,35 @@ def setup_logging(level=logging.INFO):
     )
 
 
+def build_llm_router(args) -> LLMRouter:
+    providers = []
+
+    providers.append(OpenAIProvider(api_key=os.environ.get("OPENAI_API_KEY")))
+
+    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+    ollama_model = os.environ.get("OLLAMA_MODEL", "llama3.2")
+    providers.append(OllamaProvider(base_url=ollama_url, default_model=ollama_model))
+
+    preferred = getattr(args, "provider", None) or os.environ.get("LLM_PROVIDER", "openai")
+
+    cache = ResponseCache(
+        db_path="knowledge/llm_cache.db",
+        max_entries=int(os.environ.get("LLM_CACHE_MAX", "5000")),
+        ttl_seconds=int(os.environ.get("LLM_CACHE_TTL", "86400")),
+    )
+
+    router = LLMRouter(
+        providers=providers,
+        cache=cache,
+        max_retries=3,
+        preferred=preferred,
+    )
+
+    logger.info("LLM Router initialized: preferred=%s, providers=%s",
+                preferred, [p.name for p in providers])
+    return router
+
+
 def main():
     parser = argparse.ArgumentParser(description="OmniAgent OS")
     parser.add_argument("--cli", action="store_true", help="Run in CLI mode")
@@ -42,14 +74,24 @@ def main():
     parser.add_argument("--profile", type=str, help="Knowledge profile", default="default")
     parser.add_argument("--persona", type=str, help="Persona type")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("--provider", type=str, help="LLM provider: openai or ollama", default=None)
+    parser.add_argument("--offline", action="store_true", help="Force offline mode (use local LLM)")
+    parser.add_argument("--complex", action="store_true", help="Enable task decomposition for complex goals")
+    parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint if available")
     args = parser.parse_args()
 
-    import os
     os.makedirs("logs", exist_ok=True)
+    os.makedirs("knowledge", exist_ok=True)
     setup_logging(level=logging.DEBUG if args.debug else logging.INFO)
     logger.info("OmniAgent OS starting...")
 
-    vision = VisionClient()
+    if args.offline:
+        os.environ.pop("OPENAI_API_KEY", None)
+        logger.info("Forced offline mode — will use local LLM only")
+
+    llm_router = build_llm_router(args)
+
+    vision = VisionClient(llm_router=llm_router)
     memory = MemoryVault()
     registry = SkillRegistry()
     loader = PluginLoader(registry)
@@ -64,6 +106,8 @@ def main():
     behavior = BehaviorManager()
     watchdog = SystemWatchdog()
     doctor = SystemDoctor()
+    checkpoint_mgr = CheckpointManager()
+    decomposer = TaskDecomposer(llm_router) if args.complex else None
 
     if args.persona:
         rules.update_rule("persona", args.persona)
@@ -78,6 +122,8 @@ def main():
         behavior=behavior,
         watchdog=watchdog,
         doctor=doctor,
+        checkpoint_mgr=checkpoint_mgr,
+        task_decomposer=decomposer,
     )
 
     if args.cli:
@@ -88,7 +134,12 @@ def main():
         run_server(blackboard)
         full_context = f"{rules_context}\n{knowledge_context}\n{project.get_workspace_summary()}"
         logger.info("Starting CLI mode with goal: %s", args.goal)
-        asyncio.run(orchestrator.run(blackboard, full_context))
+        logger.info("Active LLM provider: %s", llm_router.active_provider_name)
+
+        if args.complex:
+            asyncio.run(orchestrator.run_complex(blackboard, full_context))
+        else:
+            asyncio.run(orchestrator.run(blackboard, full_context))
     else:
         from gui import OmniAgentGUI
         blackboard = Blackboard("")
